@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "SpendHive",
+    "slug": "mymoney-pro-clone",
+    "version": "1.0.0",
+    "scheme": "spendhive",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#262523"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mymoneypro.clone"
+    },
+    "android": {
+      "package": "com.mymoneypro.clone",
+      "adaptiveIcon": {
+        "backgroundColor": "#262523"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "QuickAdd",
+              "label": "SpendHive Quick Add",
+              "description": "Quickly add an expense or income",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "resizeMode": "horizontal|vertical"
+            }
+          ]
+        }
+      ]
+    ]
+  }
+}
