@@ -2,19 +2,32 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
 import { useStore } from '@/store/useStore';
 import { buildExportWorkbookBytes } from '@/utils/exportExcel';
+import { buildDbBackupJson, parseDbBackupJson } from '@/utils/dbBackup';
 import { format } from 'date-fns';
 
 export function SettingsScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { accounts, categories, transactions, budgets, cashbookEntries, resetToSeed, deleteAllTransactions } =
-    useStore();
+  const {
+    accounts,
+    categories,
+    transactions,
+    budgets,
+    cashbookEntries,
+    themeMode,
+    currency,
+    notificationSettings,
+    resetToSeed,
+    deleteAllTransactions,
+    importData,
+  } = useStore();
 
   async function handleExport() {
     try {
@@ -38,8 +51,62 @@ export function SettingsScreen() {
     }
   }
 
+  async function handleExportDb() {
+    try {
+      const json = buildDbBackupJson({ accounts, categories, transactions, budgets, cashbookEntries, themeMode, currency, notificationSettings });
+      const fileName = `spendhive-db-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.json`;
+      const file = new File(Paths.document, fileName);
+      file.create({ overwrite: true });
+      file.write(json);
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export SpendHive DB File',
+        });
+      } else {
+        Alert.alert('Export Saved', `Saved to ${file.uri}`);
+      }
+    } catch (e) {
+      Alert.alert('Export Failed', 'Could not export the DB file.');
+    }
+  }
+
+  async function handleImportDb() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const file = new File(result.assets[0].uri);
+      const text = await file.text();
+      const backup = parseDbBackupJson(text);
+
+      Alert.alert(
+        'Import DB File',
+        `This will replace all current data with the backup (${backup.transactions.length} transactions, ${backup.accounts.length} accounts). Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Import',
+            style: 'destructive',
+            onPress: () => {
+              importData(backup);
+              Alert.alert('Import Complete', 'Your data has been restored from the DB file.');
+            },
+          },
+        ]
+      );
+    } catch (e) {
+      Alert.alert('Import Failed', 'Could not read this file. Make sure it is a SpendHive DB backup (.json).');
+    }
+  }
+
   function handleResetAll() {
-    Alert.alert('Reset All Data', 'This will erase all data and restore the default demo data. Continue?', [
+    Alert.alert('Reset All Data', 'This will permanently erase all data. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset All', style: 'destructive', onPress: resetToSeed },
     ]);
@@ -60,7 +127,24 @@ export function SettingsScreen() {
     <View style={styles.container}>
       <TopHeader title="Settings" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={typography.label}>EXPORT</Text>
+        <Text style={typography.label}>BACKUP</Text>
+        <Card>
+          <SettingsRow
+            icon="database-export-outline"
+            label="Export DB File"
+            description="Save all your data as a .json backup file"
+            onPress={handleExportDb}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon="database-import-outline"
+            label="Import DB File"
+            description="Restore your data from a previously exported .json backup"
+            onPress={handleImportDb}
+          />
+        </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>EXPORT</Text>
         <Card>
           <SettingsRow
             icon="microsoft-excel"
@@ -75,7 +159,7 @@ export function SettingsScreen() {
           <SettingsRow
             icon="restore"
             label="Reset All"
-            description="Erase all data and reload sample data"
+            description="Erase all data"
             danger
             onPress={handleResetAll}
           />

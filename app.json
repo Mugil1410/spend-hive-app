@@ -35,12 +35,18 @@
               "label": "SpendHive Quick Add",
               "description": "Quickly add an expense or income",
               "minWidth": "250dp",
-              "minHeight": "110dp",
+              "minHeight": "140dp",
               "resizeMode": "horizontal|vertical"
             }
           ]
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ca84777f-c603-4200-a262-b0fb467ddb54"
+      }
+    },
+    "owner": "mugil1410"
   }
 }

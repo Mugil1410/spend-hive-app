@@ -110,9 +110,14 @@ export function RecordsScreen() {
                 style={styles.row}
                 onPress={() => navigation.navigate('QuickAdd', { transactionId: item.id })}
               >
-                <CategoryIcon icon={category?.icon ?? 'help'} color={category?.color ?? colors.textSecondary} />
+                <CategoryIcon
+                  icon={item.type === 'TRANSFER' ? 'swap-horizontal' : category?.icon ?? 'help'}
+                  color={item.type === 'TRANSFER' ? colors.gold : category?.color ?? colors.textSecondary}
+                />
                 <View style={styles.rowMiddle}>
-                  <Text style={typography.body}>{category?.name ?? 'Uncategorized'}</Text>
+                  <Text style={typography.body}>
+                    {item.type === 'TRANSFER' ? 'Transfer' : category?.name ?? 'Uncategorized'}
+                  </Text>
                   <View style={styles.rowSub}>
                     <View style={styles.accountBadge}>
                       <Text style={styles.accountBadgeText}>{account?.name ?? '—'}</Text>

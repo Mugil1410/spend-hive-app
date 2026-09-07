@@ -129,45 +129,51 @@ export function QuickAddModal() {
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 12 }}>
         {type !== 'TRANSFER' ? (
-          <>
-            <Text style={typography.label}>CATEGORY</Text>
-            <DropdownField
-              placeholder="Select category"
-              icon={selectedCategory?.icon}
-              color={selectedCategory?.color}
-              value={selectedCategory?.name}
-              onPress={() => setActiveSheet('category')}
-            />
-
-            <Text style={[typography.label, { marginTop: 16 }]}>ACCOUNT</Text>
-            <DropdownField
-              placeholder="Select account"
-              icon={selectedAccount?.icon}
-              color={selectedAccount?.color}
-              value={selectedAccount?.name}
-              onPress={() => setActiveSheet('account')}
-            />
-          </>
+          <View style={styles.fieldColumns}>
+            <View style={styles.fieldColumn}>
+              <Text style={typography.label}>ACCOUNT</Text>
+              <DropdownField
+                placeholder="Select account"
+                icon={selectedAccount?.icon}
+                color={selectedAccount?.color}
+                value={selectedAccount?.name}
+                onPress={() => setActiveSheet('account')}
+              />
+            </View>
+            <View style={styles.fieldColumn}>
+              <Text style={typography.label}>CATEGORY</Text>
+              <DropdownField
+                placeholder="Select category"
+                icon={selectedCategory?.icon}
+                color={selectedCategory?.color}
+                value={selectedCategory?.name}
+                onPress={() => setActiveSheet('category')}
+              />
+            </View>
+          </View>
         ) : (
-          <>
-            <Text style={typography.label}>FROM ACCOUNT</Text>
-            <DropdownField
-              placeholder="Select account"
-              icon={selectedAccount?.icon}
-              color={selectedAccount?.color}
-              value={selectedAccount?.name}
-              onPress={() => setActiveSheet('account')}
-            />
-
-            <Text style={[typography.label, { marginTop: 16 }]}>TO ACCOUNT</Text>
-            <DropdownField
-              placeholder="Select account"
-              icon={selectedToAccount?.icon}
-              color={selectedToAccount?.color}
-              value={selectedToAccount?.name}
-              onPress={() => setActiveSheet('toAccount')}
-            />
-          </>
+          <View style={styles.fieldColumns}>
+            <View style={styles.fieldColumn}>
+              <Text style={typography.label}>FROM ACCOUNT</Text>
+              <DropdownField
+                placeholder="Select account"
+                icon={selectedAccount?.icon}
+                color={selectedAccount?.color}
+                value={selectedAccount?.name}
+                onPress={() => setActiveSheet('account')}
+              />
+            </View>
+            <View style={styles.fieldColumn}>
+              <Text style={typography.label}>TO ACCOUNT</Text>
+              <DropdownField
+                placeholder="Select account"
+                icon={selectedToAccount?.icon}
+                color={selectedToAccount?.color}
+                value={selectedToAccount?.name}
+                onPress={() => setActiveSheet('toAccount')}
+              />
+            </View>
+          </View>
         )}
 
         <Text style={[typography.label, { marginTop: 16 }]}>DATE</Text>
@@ -254,10 +260,16 @@ function DropdownField({
   return (
     <TouchableOpacity style={styles.fieldRow} onPress={onPress}>
       <View style={styles.fieldRowLeft}>
-        {icon && color ? <CategoryIcon icon={icon} color={color} size={32} /> : null}
-        <Text style={[typography.body, !value && { color: colors.textSecondary }]}>{value ?? placeholder}</Text>
+        {icon && color ? <CategoryIcon icon={icon} color={color} size={28} /> : null}
+        <Text
+          style={[typography.body, !value && { color: colors.textSecondary }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {value ?? placeholder}
+        </Text>
       </View>
-      <MaterialCommunityIcons name="chevron-down" size={20} color={colors.textSecondary} />
+      <MaterialCommunityIcons name="chevron-down" size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
@@ -273,19 +285,21 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
     typePillText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
     amountText: { textAlign: 'center', fontSize: 40, fontWeight: '700', marginVertical: 16 },
     body: { flex: 1, paddingHorizontal: 16 },
+    fieldColumns: { flexDirection: 'row', gap: 12 },
+    fieldColumn: { flex: 1, minWidth: 0 },
     fieldRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginTop: 8,
       paddingVertical: 10,
-      paddingHorizontal: 12,
+      paddingHorizontal: 10,
       backgroundColor: colors.surface,
       borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    fieldRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+    fieldRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
     dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
     noteInput: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary },
     deleteButton: { alignItems: 'center', marginTop: 20, paddingVertical: 10 },

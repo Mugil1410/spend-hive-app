@@ -77,6 +77,18 @@ interface AppState {
   resetToSeed: () => void;
   deleteAllTransactions: () => void;
 
+  // Import
+  importData: (data: {
+    accounts: Account[];
+    categories: Category[];
+    transactions: Transaction[];
+    budgets: Budget[];
+    cashbookEntries: CashbookEntry[];
+    themeMode?: ThemeMode;
+    currency?: string;
+    notificationSettings?: NotificationSettings;
+  }) => void;
+
   // Preferences
   setThemeMode: (mode: ThemeMode) => void;
   setCurrency: (code: string) => void;
@@ -284,6 +296,19 @@ export const useStore = create<AppState>()(
       },
       deleteAllTransactions: () => {
         set({ transactions: [] });
+      },
+
+      importData: ({ accounts, categories, transactions, budgets, cashbookEntries, themeMode, currency, notificationSettings }) => {
+        set((state) => ({
+          accounts,
+          categories,
+          transactions,
+          budgets,
+          cashbookEntries,
+          themeMode: themeMode ?? state.themeMode,
+          currency: currency ?? state.currency,
+          notificationSettings: notificationSettings ?? state.notificationSettings,
+        }));
       },
 
       setThemeMode: (mode) => set({ themeMode: mode }),
