@@ -6,3 +6,9 @@ web-build/
 .DS_Store
 android/
 ios/
+
+# Personal financial data / DB dumps — never commit real user data
+*.db
+spendhive-import*.json
+spendhive-db-*.json
+spendhive-export-*.xlsx

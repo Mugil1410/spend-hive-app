@@ -1,6 +1,6 @@
 {
-  "name": "mymoney-pro-clone",
-  "version": "1.0.0",
+  "name": "spendhive",
+  "version": "1.0.1",
   "main": "index.js",
   "private": true,
   "scripts": {

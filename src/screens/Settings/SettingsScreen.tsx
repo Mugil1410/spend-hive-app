@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -81,8 +82,7 @@ export function SettingsScreen() {
       });
       if (result.canceled || !result.assets?.[0]) return;
 
-      const file = new File(result.assets[0].uri);
-      const text = await file.text();
+      const text = await readAsStringAsync(result.assets[0].uri);
       const backup = parseDbBackupJson(text);
 
       Alert.alert(
@@ -101,7 +101,8 @@ export function SettingsScreen() {
         ]
       );
     } catch (e) {
-      Alert.alert('Import Failed', 'Could not read this file. Make sure it is a SpendHive DB backup (.json).');
+      const message = e instanceof Error ? e.message : String(e);
+      Alert.alert('Import Failed', `Could not read this file. Make sure it is a SpendHive DB backup (.json).\n\n${message}`);
     }
   }
 

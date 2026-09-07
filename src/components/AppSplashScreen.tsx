@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Logo } from './Logo';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { darkColors } from '@/theme/colors';
 
 export function AppSplashScreen() {
   return (
     <View style={styles.container}>
-      <Logo size={72} color={darkColors.gold} letterColor={darkColors.background} />
+      <Image
+        source={require('../../assets/app-icon.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
       <Text style={styles.title}>SpendHive</Text>
     </View>
   );
@@ -19,6 +22,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: darkColors.background,
     gap: 12,
+  },
+  logo: {
+    width: 96,
+    height: 96,
   },
   title: {
     color: darkColors.textPrimary,
