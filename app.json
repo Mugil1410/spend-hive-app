@@ -1,18 +1,13 @@
 {
   "expo": {
     "name": "SpendHive",
-    "slug": "spendhive",
+    "slug": "mymoney-pro-clone",
     "version": "1.0.1",
     "scheme": "spendhive",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "icon": "./assets/app-icon.png",
-    "splash": {
-      "image": "./assets/app-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#262523"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -43,6 +38,15 @@
               "resizeMode": "horizontal|vertical"
             }
           ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/app-icon.png",
+          "imageWidth": 96,
+          "resizeMode": "contain",
+          "backgroundColor": "#262523"
         }
       ]
     ],

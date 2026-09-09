@@ -25,7 +25,7 @@ export function SettingsScreen() {
     themeMode,
     currency,
     notificationSettings,
-    resetToSeed,
+    resetAllData,
     deleteAllTransactions,
     importData,
   } = useStore();
@@ -109,7 +109,7 @@ export function SettingsScreen() {
   function handleResetAll() {
     Alert.alert('Reset All Data', 'This will permanently erase all data. Continue?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset All', style: 'destructive', onPress: resetToSeed },
+      { text: 'Reset All', style: 'destructive', onPress: resetAllData },
     ]);
   }
 

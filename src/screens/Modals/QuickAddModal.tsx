@@ -48,6 +48,7 @@ export function QuickAddModal() {
   const [date, setDate] = useState(editingTx ? new Date(editingTx.date) : new Date());
   const [note, setNote] = useState(editingTx?.note ?? '');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
 
   const visibleCategories = useMemo(
@@ -184,12 +185,26 @@ export function QuickAddModal() {
         {showDatePicker && (
           <DateTimePicker
             value={date}
-            mode="datetime"
+            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(_, selected) => {
+            onValueChange={(_, selected) => {
               setShowDatePicker(false);
-              if (selected) setDate(selected);
+              setDate(selected);
+              if (Platform.OS === 'android') setShowTimePicker(true);
             }}
+            onDismiss={() => setShowDatePicker(false)}
+          />
+        )}
+        {showTimePicker && (
+          <DateTimePicker
+            value={date}
+            mode="time"
+            display="default"
+            onValueChange={(_, selected) => {
+              setShowTimePicker(false);
+              setDate(selected);
+            }}
+            onDismiss={() => setShowTimePicker(false)}
           />
         )}
 

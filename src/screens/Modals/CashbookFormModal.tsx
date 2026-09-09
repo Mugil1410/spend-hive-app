@@ -39,6 +39,7 @@ export function CashbookFormModal() {
   const [datePickerIndex, setDatePickerIndex] = useState<number | null>(null);
   const [createdAt, setCreatedAt] = useState(editing ? new Date(editing.createdAt) : new Date());
   const [showCreatedAtPicker, setShowCreatedAtPicker] = useState(false);
+  const [showCreatedAtTimePicker, setShowCreatedAtTimePicker] = useState(false);
 
   const contactSuggestions = useMemo(() => {
     if (contactName.trim().length < 3) return [];
@@ -153,12 +154,26 @@ export function CashbookFormModal() {
         {showCreatedAtPicker && (
           <DateTimePicker
             value={createdAt}
-            mode="datetime"
+            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(_, selected) => {
+            onValueChange={(_, selected) => {
               setShowCreatedAtPicker(false);
-              if (selected) setCreatedAt(selected);
+              setCreatedAt(selected);
+              if (Platform.OS === 'android') setShowCreatedAtTimePicker(true);
             }}
+            onDismiss={() => setShowCreatedAtPicker(false)}
+          />
+        )}
+        {showCreatedAtTimePicker && (
+          <DateTimePicker
+            value={createdAt}
+            mode="time"
+            display="default"
+            onValueChange={(_, selected) => {
+              setShowCreatedAtTimePicker(false);
+              setCreatedAt(selected);
+            }}
+            onDismiss={() => setShowCreatedAtTimePicker(false)}
           />
         )}
 
@@ -233,11 +248,12 @@ export function CashbookFormModal() {
                 value={installments[datePickerIndex].dueDate}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(_, selected) => {
+                onValueChange={(_, selected) => {
                   const idx = datePickerIndex;
                   setDatePickerIndex(null);
-                  if (selected && idx !== null) updateInstallmentDate(idx, selected);
+                  if (idx !== null) updateInstallmentDate(idx, selected);
                 }}
+                onDismiss={() => setDatePickerIndex(null)}
               />
             )}
           </>

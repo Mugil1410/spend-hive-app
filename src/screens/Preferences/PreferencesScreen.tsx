@@ -146,14 +146,13 @@ export function PreferencesScreen() {
           value={timeValue}
           mode="time"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(_, selected) => {
+          onValueChange={(_, selected) => {
             setShowTimePicker(false);
-            if (selected) {
-              const hh = String(selected.getHours()).padStart(2, '0');
-              const mm = String(selected.getMinutes()).padStart(2, '0');
-              updateNotificationSettings({ dailyReminderTime: `${hh}:${mm}` });
-            }
+            const hh = String(selected.getHours()).padStart(2, '0');
+            const mm = String(selected.getMinutes()).padStart(2, '0');
+            updateNotificationSettings({ dailyReminderTime: `${hh}:${mm}` });
           }}
+          onDismiss={() => setShowTimePicker(false)}
         />
       )}
     </View>

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { appStorage } from './storage';
-import { seedAccounts, seedCategories, seedTransactions, seedBudgets, seedCashbookEntries } from './seed';
 import { generateId } from '@/utils/id';
 import {
   Account,
@@ -74,7 +73,7 @@ interface AppState {
   ) => void;
 
   // Reset / Delete
-  resetToSeed: () => void;
+  resetAllData: () => void;
   deleteAllTransactions: () => void;
 
   // Import
@@ -104,11 +103,11 @@ function computeInstallmentStatus(expected: number, paid: number): CashbookInsta
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
-      accounts: seedAccounts,
-      categories: seedCategories,
-      transactions: seedTransactions,
-      budgets: seedBudgets,
-      cashbookEntries: seedCashbookEntries,
+      accounts: [],
+      categories: [],
+      transactions: [],
+      budgets: [],
+      cashbookEntries: [],
       themeMode: 'dark',
       currency: 'INR',
       notificationSettings: {
@@ -285,13 +284,13 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      resetToSeed: () => {
+      resetAllData: () => {
         set({
-          accounts: seedAccounts,
-          categories: seedCategories,
-          transactions: seedTransactions,
-          budgets: seedBudgets,
-          cashbookEntries: seedCashbookEntries,
+          accounts: [],
+          categories: [],
+          transactions: [],
+          budgets: [],
+          cashbookEntries: [],
         });
       },
       deleteAllTransactions: () => {

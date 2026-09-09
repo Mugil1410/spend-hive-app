@@ -127,11 +127,12 @@ export function CashbookEntryDetailScreen() {
             value={new Date(entry.installments.find((i) => i.id === editingDueId)!.dueDate)}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(_, selected) => {
+            onValueChange={(_, selected) => {
               const id = editingDueId;
               setEditingDueId(null);
-              if (selected && id) updateInstallmentDueDate(entry.id, id, selected.toISOString());
+              if (id) updateInstallmentDueDate(entry.id, id, selected.toISOString());
             }}
+            onDismiss={() => setEditingDueId(null)}
           />
         )}
 

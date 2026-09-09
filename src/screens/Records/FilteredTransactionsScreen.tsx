@@ -79,6 +79,11 @@ export function FilteredTransactionsScreen() {
                       <Text style={styles.accountBadgeText}>{account?.name ?? '—'}</Text>
                     </View>
                     <Text style={typography.caption}>{format(new Date(item.date), 'MMM d, yyyy')}</Text>
+                    {!!item.note && (
+                      <Text style={typography.caption} numberOfLines={1}>
+                        · {item.note}
+                      </Text>
+                    )}
                   </View>
                 </View>
                 <Text
