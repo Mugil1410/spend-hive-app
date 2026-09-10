@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, Switch } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { DisplayOptions, DisplayRange } from '@/types';
@@ -22,7 +23,8 @@ interface Props {
 
 export function DisplayOptionsModal({ visible, value, onChange, onClose }: Props) {
   const { colors, typography } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -59,7 +61,7 @@ export function DisplayOptionsModal({ visible, value, onChange, onClose }: Props
   );
 }
 
-function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
+function createStyles(colors: ReturnType<typeof useTheme>['colors'], bottomInset: number) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
     card: {
@@ -69,6 +71,7 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderWidth: 1,
       borderColor: colors.border,
       padding: 18,
+      paddingBottom: Math.max(18, bottomInset + 12),
     },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     pill: {

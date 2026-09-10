@@ -11,6 +11,7 @@ import { BudgetsScreen } from '@/screens/Budgets/BudgetsScreen';
 import { AccountsScreen } from '@/screens/Accounts/AccountsScreen';
 import { CategoriesScreen } from '@/screens/Categories/CategoriesScreen';
 import { CashbookScreen } from '@/screens/Cashbook/CashbookScreen';
+import { EventsScreen } from '@/screens/Events/EventsScreen';
 import { SettingsScreen } from '@/screens/Settings/SettingsScreen';
 import { PreferencesScreen } from '@/screens/Preferences/PreferencesScreen';
 
@@ -24,7 +25,7 @@ const VISIBLE_ICONS: Record<string, string> = {
   Categories: 'shape-outline',
 };
 
-const HIDDEN_TABS: (keyof BottomTabParamList)[] = ['Cashbook', 'Settings', 'Preferences'];
+const HIDDEN_TABS: (keyof BottomTabParamList)[] = ['Cashbook', 'Events', 'Settings', 'Preferences'];
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -79,6 +80,7 @@ export function BottomTabNavigator() {
       <Tab.Screen name="Accounts" component={AccountsScreen} />
       <Tab.Screen name="Categories" component={CategoriesScreen} />
       <Tab.Screen name="Cashbook" component={CashbookScreen} />
+      <Tab.Screen name="Events" component={EventsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
       <Tab.Screen name="Preferences" component={PreferencesScreen} />
     </Tab.Navigator>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { appStorage } from './storage';
+import { CURRENT_VERSION, runMigrations } from './migrations';
 import { generateId } from '@/utils/id';
 import {
   Account,
@@ -11,6 +12,8 @@ import {
   CashbookInstallment,
   CashbookType,
   TransactionType,
+  Debtor,
+  Event,
 } from '@/types';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -29,6 +32,8 @@ interface AppState {
   transactions: Transaction[];
   budgets: Budget[];
   cashbookEntries: CashbookEntry[];
+  debtors: Debtor[];
+  events: Event[];
   themeMode: ThemeMode;
   currency: string;
   notificationSettings: NotificationSettings;
@@ -51,17 +56,23 @@ interface AppState {
   // Budgets
   setBudget: (categoryId: string, period: string, limit: number) => void;
   removeBudget: (categoryId: string, period: string) => void;
+  copyBudgetsForward: (fromPeriod: string, toPeriod: string) => void;
 
   // Cashbook
   addCashbookEntry: (entry: {
     type: CashbookType;
     contactName: string;
+    debtorId: string;
+    accountId: string;
     totalAmount: number;
     installments: Array<{ expectedAmount: number; dueDate: string }>;
     note?: string;
     createdAt?: string;
   }) => string;
-  updateCashbookEntry: (id: string, patch: Partial<Pick<CashbookEntry, 'contactName' | 'note' | 'createdAt'>>) => void;
+  updateCashbookEntry: (
+    id: string,
+    patch: Partial<Pick<CashbookEntry, 'contactName' | 'debtorId' | 'note' | 'createdAt'>>
+  ) => void;
   deleteCashbookEntry: (id: string) => void;
   updateInstallmentDueDate: (entryId: string, installmentId: string, dueDate: string) => void;
   updateInstallmentAmount: (entryId: string, installmentId: string, expectedAmount: number) => void;
@@ -71,6 +82,16 @@ interface AppState {
     paymentAmount: number,
     accountId: string
   ) => void;
+
+  // Debtors
+  findOrCreateDebtor: (name: string) => string;
+  updateDebtor: (id: string, patch: Partial<Omit<Debtor, 'id'>>) => void;
+  deleteDebtor: (id: string) => void;
+
+  // Events
+  addEvent: (event: Omit<Event, 'id'>) => string;
+  updateEvent: (id: string, patch: Partial<Omit<Event, 'id'>>) => void;
+  deleteEvent: (id: string) => void;
 
   // Reset / Delete
   resetAllData: () => void;
@@ -83,6 +104,8 @@ interface AppState {
     transactions: Transaction[];
     budgets: Budget[];
     cashbookEntries: CashbookEntry[];
+    debtors?: Debtor[];
+    events?: Event[];
     themeMode?: ThemeMode;
     currency?: string;
     notificationSettings?: NotificationSettings;
@@ -108,6 +131,8 @@ export const useStore = create<AppState>()(
       transactions: [],
       budgets: [],
       cashbookEntries: [],
+      debtors: [],
+      events: [],
       themeMode: 'dark',
       currency: 'INR',
       notificationSettings: {
@@ -180,8 +205,22 @@ export const useStore = create<AppState>()(
           budgets: state.budgets.filter((b) => !(b.categoryId === categoryId && b.period === period)),
         }));
       },
+      copyBudgetsForward: (fromPeriod, toPeriod) => {
+        set((state) => {
+          const fromBudgets = state.budgets.filter((b) => b.period === fromPeriod);
+          const toBudgetsByCategory = new Map(
+            state.budgets.filter((b) => b.period === toPeriod).map((b) => [b.categoryId, b])
+          );
+          const untouched = state.budgets.filter((b) => b.period !== toPeriod);
+          const copied = fromBudgets.map((b) => {
+            const existing = toBudgetsByCategory.get(b.categoryId);
+            return { id: existing?.id ?? generateId(), categoryId: b.categoryId, period: toPeriod, limit: b.limit };
+          });
+          return { budgets: [...untouched, ...copied] };
+        });
+      },
 
-      addCashbookEntry: ({ type, contactName, totalAmount, installments, note, createdAt }) => {
+      addCashbookEntry: ({ type, contactName, debtorId, accountId, totalAmount, installments, note, createdAt }) => {
         const id = generateId();
         const builtInstallments: CashbookInstallment[] = installments.map((i) => ({
           id: generateId(),
@@ -190,16 +229,41 @@ export const useStore = create<AppState>()(
           dueDate: i.dueDate,
           status: 'PENDING',
         }));
+        const resolvedCreatedAt = createdAt ?? new Date().toISOString();
         const entry: CashbookEntry = {
           id,
           type,
           contactName,
+          debtorId,
+          accountId,
           totalAmount,
           installments: builtInstallments,
-          createdAt: createdAt ?? new Date().toISOString(),
+          createdAt: resolvedCreatedAt,
           note,
         };
-        set((state) => ({ cashbookEntries: [...state.cashbookEntries, entry] }));
+
+        // Creation-time transaction: a LOAN brings money in (INCOME), a LENT sends
+        // money out (EXPENSE) - immediately, separate from later repayment transactions.
+        const state = get();
+        const creationCategoryId =
+          type === 'LOAN'
+            ? ensureCategory(state, 'INCOME', 'Loan Received', 'cash-plus', '#50B98A')
+            : ensureCategory(state, 'EXPENSE', 'Money Lent', 'hand-coin-outline', '#E86759');
+        const creationTransaction: Transaction = {
+          id: generateId(),
+          amount: totalAmount,
+          type: type === 'LOAN' ? 'INCOME' : 'EXPENSE',
+          categoryId: creationCategoryId,
+          accountId,
+          date: resolvedCreatedAt,
+          note: `${type === 'LOAN' ? 'Loan from' : 'Lent to'} ${contactName}`,
+          cashbookRef: { entryId: id },
+        };
+
+        set((s) => ({
+          cashbookEntries: [...s.cashbookEntries, entry],
+          transactions: [...s.transactions, creationTransaction],
+        }));
         return id;
       },
       updateCashbookEntry: (id, patch) => {
@@ -247,8 +311,11 @@ export const useStore = create<AppState>()(
         const applied = Math.min(paymentAmount, remaining > 0 ? paymentAmount : paymentAmount);
         const newPaidAmount = installment.paidAmount + applied;
 
-        // Category used for auto-generated cashbook transactions.
-        const categoryId = entry.type === 'LOAN' ? ensureCashbookCategory(state, 'EXPENSE') : ensureCashbookCategory(state, 'INCOME');
+        // Category used for auto-generated cashbook repayment transactions.
+        const categoryId =
+          entry.type === 'LOAN'
+            ? ensureCategory(state, 'EXPENSE', 'Loan Payment', 'hand-coin', '#E86759')
+            : ensureCategory(state, 'INCOME', 'Debt Collection', 'cash-refund', '#50B98A');
 
         const txType: TransactionType = entry.type === 'LOAN' ? 'EXPENSE' : 'INCOME';
         const txId = generateId();
@@ -284,6 +351,45 @@ export const useStore = create<AppState>()(
         }));
       },
 
+      findOrCreateDebtor: (name) => {
+        const key = normalizeDebtorName(name);
+        const state = get();
+        const existing = state.debtors.find((d) => d.nameKey === key);
+        if (existing) return existing.id;
+        const id = generateId();
+        const debtor: Debtor = { id, name: name.trim(), nameKey: key, createdAt: new Date().toISOString() };
+        set((s) => ({ debtors: [...s.debtors, debtor] }));
+        return id;
+      },
+      updateDebtor: (id, patch) => {
+        set((state) => ({
+          debtors: state.debtors.map((d) =>
+            d.id === id
+              ? { ...d, ...patch, nameKey: patch.name !== undefined ? normalizeDebtorName(patch.name) : d.nameKey }
+              : d
+          ),
+        }));
+      },
+      deleteDebtor: (id) => {
+        set((state) => ({
+          debtors: state.debtors.map((d) => (d.id === id ? { ...d, archived: true } : d)),
+        }));
+      },
+
+      addEvent: (event) => {
+        const id = generateId();
+        set((state) => ({ events: [...state.events, { ...event, id }] }));
+        return id;
+      },
+      updateEvent: (id, patch) => {
+        set((state) => ({
+          events: state.events.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+        }));
+      },
+      deleteEvent: (id) => {
+        set((state) => ({ events: state.events.map((e) => (e.id === id ? { ...e, archived: true } : e)) }));
+      },
+
       resetAllData: () => {
         set({
           accounts: [],
@@ -291,19 +397,34 @@ export const useStore = create<AppState>()(
           transactions: [],
           budgets: [],
           cashbookEntries: [],
+          debtors: [],
+          events: [],
         });
       },
       deleteAllTransactions: () => {
         set({ transactions: [] });
       },
 
-      importData: ({ accounts, categories, transactions, budgets, cashbookEntries, themeMode, currency, notificationSettings }) => {
+      importData: ({
+        accounts,
+        categories,
+        transactions,
+        budgets,
+        cashbookEntries,
+        debtors,
+        events,
+        themeMode,
+        currency,
+        notificationSettings,
+      }) => {
         set((state) => ({
           accounts,
           categories,
           transactions,
           budgets,
           cashbookEntries,
+          debtors: debtors ?? state.debtors,
+          events: events ?? state.events,
           themeMode: themeMode ?? state.themeMode,
           currency: currency ?? state.currency,
           notificationSettings: notificationSettings ?? state.notificationSettings,
@@ -319,12 +440,16 @@ export const useStore = create<AppState>()(
     {
       name: 'mymoney-pro-store',
       storage: createJSONStorage(() => appStorage),
+      version: CURRENT_VERSION,
+      migrate: (persistedState, version) => runMigrations(persistedState, version) as AppState,
       partialize: (state) => ({
         accounts: state.accounts,
         categories: state.categories,
         transactions: state.transactions,
         budgets: state.budgets,
         cashbookEntries: state.cashbookEntries,
+        debtors: state.debtors,
+        events: state.events,
         themeMode: state.themeMode,
         currency: state.currency,
         notificationSettings: state.notificationSettings,
@@ -333,18 +458,15 @@ export const useStore = create<AppState>()(
   )
 );
 
-function ensureCashbookCategory(state: AppState, type: 'EXPENSE' | 'INCOME'): string {
-  const name = type === 'EXPENSE' ? 'Loan Payment' : 'Debt Collection';
+function ensureCategory(state: AppState, type: 'EXPENSE' | 'INCOME', name: string, icon: string, color: string): string {
   const existing = state.categories.find((c) => c.type === type && c.name === name);
   if (existing) return existing.id;
   const id = generateId();
-  const category: Category = {
-    id,
-    name,
-    type,
-    icon: type === 'EXPENSE' ? 'hand-coin' : 'cash-refund',
-    color: type === 'EXPENSE' ? '#E86759' : '#50B98A',
-  };
+  const category: Category = { id, name, type, icon, color };
   useStore.setState((s) => ({ categories: [...s.categories, category] }));
   return id;
+}
+
+function normalizeDebtorName(name: string): string {
+  return name.trim().toLowerCase();
 }

@@ -11,7 +11,7 @@ import { FAB } from '@/components/FAB';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { getRangeForAnchor } from '@/utils/dateUtils';
-import { filterTransactionsInRange, sumByType, computeAccountBalance } from '@/utils/calculations';
+import { filterTransactionsInRange, sumByType, computeAccountBalance, computeAllAccountBalances } from '@/utils/calculations';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 export function AccountsScreen() {
@@ -23,11 +23,15 @@ export function AccountsScreen() {
 
   const range = useMemo(() => getRangeForAnchor(anchor, 'MONTHLY'), [anchor]);
   const inRange = useMemo(() => filterTransactionsInRange(transactions, range), [transactions, range]);
-  const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts]);
+  const activeAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts]
+  );
+  const balances = useMemo(() => computeAllAccountBalances(activeAccounts, transactions), [activeAccounts, transactions]);
 
   const expenseSoFar = sumByType(inRange, 'EXPENSE');
   const incomeSoFar = sumByType(inRange, 'INCOME');
-  const totalBalance = accounts.filter((a) => !a.archived).reduce((s, a) => s + computeAccountBalance(a, transactions), 0);
+  const totalBalance = activeAccounts.reduce((s, a) => s + (balances.get(a.id) ?? 0), 0);
 
   return (
     <View style={styles.container}>
@@ -62,7 +66,7 @@ export function AccountsScreen() {
                 <MaterialCommunityIcons name={account.icon as any} size={22} color={account.color} />
               </View>
               <Text style={[typography.body, { flex: 1 }]}>{account.name}</Text>
-              <Text style={typography.amount}>{formatCurrency(computeAccountBalance(account, transactions))}</Text>
+              <Text style={typography.amount}>{formatCurrency(balances.get(account.id) ?? 0)}</Text>
               <TouchableOpacity
                 style={styles.editButton}
                 hitSlop={8}

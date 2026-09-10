@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, FlatList, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
@@ -23,7 +24,8 @@ interface Props {
 
 export function SelectSheet({ visible, title, options, selectedId, onSelect, onClose }: Props) {
   const { colors, typography } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -62,7 +64,7 @@ export function SelectSheet({ visible, title, options, selectedId, onSelect, onC
   );
 }
 
-function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
+function createStyles(colors: ReturnType<typeof useTheme>['colors'], bottomInset: number) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
     card: {
@@ -73,7 +75,7 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderColor: colors.border,
       paddingHorizontal: 18,
       paddingTop: 18,
-      paddingBottom: 8,
+      paddingBottom: Math.max(8, bottomInset + 8),
       maxHeight: '70%',
     },
     title: { textAlign: 'center', marginBottom: 8 },

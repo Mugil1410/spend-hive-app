@@ -1,7 +1,7 @@
-import { Account, Category, Transaction, Budget, CashbookEntry } from '@/types';
+import { Account, Category, Transaction, Budget, CashbookEntry, Debtor, Event } from '@/types';
 import { ThemeMode, NotificationSettings } from '@/store/useStore';
 
-export const DB_BACKUP_VERSION = 1;
+export const DB_BACKUP_VERSION = 2;
 
 export interface DbBackup {
   version: number;
@@ -11,6 +11,8 @@ export interface DbBackup {
   transactions: Transaction[];
   budgets: Budget[];
   cashbookEntries: CashbookEntry[];
+  debtors: Debtor[];
+  events: Event[];
   themeMode?: ThemeMode;
   currency?: string;
   notificationSettings?: NotificationSettings;
@@ -39,6 +41,8 @@ export function parseDbBackupJson(text: string): DbBackup {
     transactions: data.transactions,
     budgets: Array.isArray(data.budgets) ? data.budgets : [],
     cashbookEntries: Array.isArray(data.cashbookEntries) ? data.cashbookEntries : [],
+    debtors: Array.isArray(data.debtors) ? data.debtors : [],
+    events: Array.isArray(data.events) ? data.events : [],
     themeMode: data.themeMode,
     currency: data.currency,
     notificationSettings: data.notificationSettings,

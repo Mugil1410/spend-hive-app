@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -165,7 +165,8 @@ function EditAmountModal({
   onClose: () => void;
 }) {
   const { colors, typography } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
   const currencySymbol = useCurrencySymbol();
   const { raw, numericValue, handleKey, reset } = useAmountInput(String(initialValue));
 
@@ -200,7 +201,7 @@ function EditAmountModal({
   );
 }
 
-function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
+function createStyles(colors: ReturnType<typeof useTheme>['colors'], bottomInset = 0) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     header: {
@@ -232,6 +233,7 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderWidth: 1,
       borderColor: colors.border,
       padding: 18,
+      paddingBottom: Math.max(18, bottomInset + 12),
     },
     amountText: { textAlign: 'center', fontSize: 36, fontWeight: '700', marginVertical: 16 },
     amountActions: { flexDirection: 'row', gap: 12, marginTop: 8 },

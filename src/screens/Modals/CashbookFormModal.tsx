@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
+import { FormScreen } from '@/components/FormScreen';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { addDays, format } from 'date-fns';
@@ -23,10 +23,20 @@ export function CashbookFormModal() {
   const route = useRoute<RouteProp<RootStackParamList, 'CashbookForm'>>();
   const { type, entryId } = route.params;
 
-  const { cashbookEntries, addCashbookEntry, updateCashbookEntry } = useStore();
+  const { cashbookEntries, debtors, accounts, addCashbookEntry, updateCashbookEntry, findOrCreateDebtor } = useStore();
   const editing = entryId ? cashbookEntries.find((e) => e.id === entryId) : undefined;
 
+  const activeDebtors = useMemo(
+    () => debtors.filter((d) => !d.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [debtors]
+  );
+  const sortedAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts]
+  );
+
   const [contactName, setContactName] = useState(editing?.contactName ?? '');
+  const [accountId, setAccountId] = useState<string | undefined>(editing?.accountId ?? sortedAccounts[0]?.id);
   const [note, setNote] = useState(editing?.note ?? '');
   const [totalAmount, setTotalAmount] = useState(editing ? String(editing.totalAmount) : '');
   const [multiDue, setMultiDue] = useState((editing?.installments.length ?? 1) > 1);
@@ -42,11 +52,10 @@ export function CashbookFormModal() {
   const [showCreatedAtTimePicker, setShowCreatedAtTimePicker] = useState(false);
 
   const contactSuggestions = useMemo(() => {
-    if (contactName.trim().length < 3) return [];
     const q = contactName.trim().toLowerCase();
-    const names = new Set(cashbookEntries.map((e) => e.contactName));
-    return Array.from(names).filter((n) => n.toLowerCase().includes(q) && n.toLowerCase() !== q);
-  }, [contactName, cashbookEntries]);
+    if (!q) return [];
+    return activeDebtors.filter((d) => d.nameKey.includes(q) && d.nameKey !== q);
+  }, [contactName, activeDebtors]);
 
   function regenerateInstallments(count: number, total: string) {
     const amountEach = total ? (parseFloat(total) / count).toFixed(2) : '';
@@ -88,21 +97,27 @@ export function CashbookFormModal() {
   const canSave = editing
     ? contactName.trim().length > 0
     : contactName.trim().length > 0 &&
+      !!accountId &&
       totalValid &&
       installments.every((i) => parseFloat(i.amount) > 0);
 
   function handleSave() {
     if (!canSave) return;
+    const debtorId = findOrCreateDebtor(contactName.trim());
     if (editing) {
       updateCashbookEntry(editing.id, {
         contactName: contactName.trim(),
+        debtorId,
         note: note.trim() || undefined,
         createdAt: createdAt.toISOString(),
       });
     } else {
+      if (!accountId) return;
       addCashbookEntry({
         type,
         contactName: contactName.trim(),
+        debtorId,
+        accountId,
         totalAmount: parseFloat(totalAmount),
         installments: installments.map((i) => ({ expectedAmount: parseFloat(i.amount), dueDate: i.dueDate.toISOString() })),
         note: note.trim() || undefined,
@@ -113,20 +128,12 @@ export function CashbookFormModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={typography.h2}>
-          {editing ? 'Edit' : 'New'} {type === 'LOAN' ? 'Loan' : 'Lent'}
-        </Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave}>
-          <Text style={[styles.save, !canSave && { opacity: 0.4 }]}>Save</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+    <FormScreen
+      title={`${editing ? 'Edit' : 'New'} ${type === 'LOAN' ? 'Loan' : 'Lent'}`}
+      onCancel={() => navigation.goBack()}
+      onSave={handleSave}
+      saveDisabled={!canSave}
+    >
         <Text style={typography.label}>CONTACT NAME</Text>
         <TextInput
           style={styles.input}
@@ -137,13 +144,36 @@ export function CashbookFormModal() {
         />
         {contactSuggestions.length > 0 && (
           <View style={styles.suggestions}>
-            {contactSuggestions.slice(0, 5).map((name) => (
-              <TouchableOpacity key={name} style={styles.suggestionRow} onPress={() => setContactName(name)}>
+            {contactSuggestions.slice(0, 5).map((debtor) => (
+              <TouchableOpacity
+                key={debtor.id}
+                style={styles.suggestionRow}
+                onPress={() => setContactName(debtor.name)}
+              >
                 <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
-                <Text style={typography.body}>{name}</Text>
+                <Text style={typography.body}>{debtor.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
+        )}
+
+        {!editing && (
+          <>
+            <Text style={[typography.label, { marginTop: 16 }]}>
+              {type === 'LOAN' ? 'RECEIVE INTO ACCOUNT' : 'GIVE FROM ACCOUNT'}
+            </Text>
+            <View style={styles.pillsRow}>
+              {sortedAccounts.map((a) => (
+                <TouchableOpacity
+                  key={a.id}
+                  style={[styles.pill, accountId === a.id && styles.pillActive]}
+                  onPress={() => setAccountId(a.id)}
+                >
+                  <Text style={[typography.body, accountId === a.id && { color: colors.background }]}>{a.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
         )}
 
         <Text style={[typography.label, { marginTop: 16 }]}>CREATED ON</Text>
@@ -267,26 +297,12 @@ export function CashbookFormModal() {
           placeholder="Optional note"
           placeholderTextColor={colors.textSecondary}
         />
-      </ScrollView>
-    </SafeAreaView>
+    </FormScreen>
   );
 }
 
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.separator,
-    },
-    cancel: { color: colors.textSecondary, fontSize: 14 },
-    save: { color: colors.gold, fontSize: 14, fontWeight: '700' },
-    body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
     input: {
       marginTop: 8,
       paddingVertical: 10,

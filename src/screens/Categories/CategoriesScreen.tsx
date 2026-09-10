@@ -18,7 +18,10 @@ export function CategoriesScreen() {
   const { categories } = useStore();
   const [tab, setTab] = useState<CategoryType>('EXPENSE');
 
-  const filtered = categories.filter((c) => c.type === tab);
+  const filtered = useMemo(
+    () => categories.filter((c) => c.type === tab).sort((a, b) => a.name.localeCompare(b.name)),
+    [categories, tab]
+  );
 
   return (
     <View style={styles.container}>

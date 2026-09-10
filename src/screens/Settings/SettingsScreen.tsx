@@ -4,36 +4,37 @@ import { File, Paths } from 'expo-file-system';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
 import { useStore } from '@/store/useStore';
-import { buildExportWorkbookBytes } from '@/utils/exportExcel';
-import { buildDbBackupJson, parseDbBackupJson } from '@/utils/dbBackup';
+import { RootStackParamList } from '@/navigation/types';
+import { buildTransactionsWorkbookBytes } from '@/utils/exportExcel';
+import { setPendingRestoreText } from '@/utils/pendingRestore';
 import { format } from 'date-fns';
 
 export function SettingsScreen() {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     accounts,
     categories,
     transactions,
-    budgets,
+    events,
     cashbookEntries,
-    themeMode,
-    currency,
-    notificationSettings,
+    debtors,
     resetAllData,
     deleteAllTransactions,
-    importData,
   } = useStore();
 
-  async function handleExport() {
+  async function handleExportTransactions() {
     try {
-      const bytes = buildExportWorkbookBytes({ accounts, categories, transactions, budgets, cashbookEntries });
-      const fileName = `spendhive-export-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`;
+      const bytes = buildTransactionsWorkbookBytes({ transactions, accounts, categories, events, cashbookEntries, debtors });
+      const fileName = `spendhive-transactions-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`;
       const file = new File(Paths.document, fileName);
       file.create({ overwrite: true });
       file.write(bytes);
@@ -42,39 +43,21 @@ export function SettingsScreen() {
       if (canShare) {
         await Sharing.shareAsync(file.uri, {
           mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Export SpendHive Data',
+          dialogTitle: 'Export Transactions',
         });
       } else {
         Alert.alert('Export Saved', `Saved to ${file.uri}`);
       }
     } catch (e) {
-      Alert.alert('Export Failed', 'Could not export data file.');
+      Alert.alert('Export Failed', 'Could not export transactions.');
     }
   }
 
-  async function handleExportDb() {
-    try {
-      const json = buildDbBackupJson({ accounts, categories, transactions, budgets, cashbookEntries, themeMode, currency, notificationSettings });
-      const fileName = `spendhive-db-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.json`;
-      const file = new File(Paths.document, fileName);
-      file.create({ overwrite: true });
-      file.write(json);
-
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export SpendHive DB File',
-        });
-      } else {
-        Alert.alert('Export Saved', `Saved to ${file.uri}`);
-      }
-    } catch (e) {
-      Alert.alert('Export Failed', 'Could not export the DB file.');
-    }
+  function handleBackup() {
+    navigation.navigate('BackupPassword', { mode: 'backup' });
   }
 
-  async function handleImportDb() {
+  async function handleRestore() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/json', 'text/plain', '*/*'],
@@ -83,26 +66,10 @@ export function SettingsScreen() {
       if (result.canceled || !result.assets?.[0]) return;
 
       const text = await readAsStringAsync(result.assets[0].uri);
-      const backup = parseDbBackupJson(text);
-
-      Alert.alert(
-        'Import DB File',
-        `This will replace all current data with the backup (${backup.transactions.length} transactions, ${backup.accounts.length} accounts). Continue?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Import',
-            style: 'destructive',
-            onPress: () => {
-              importData(backup);
-              Alert.alert('Import Complete', 'Your data has been restored from the DB file.');
-            },
-          },
-        ]
-      );
+      setPendingRestoreText(text);
+      navigation.navigate('BackupPassword', { mode: 'restore' });
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      Alert.alert('Import Failed', `Could not read this file. Make sure it is a SpendHive DB backup (.json).\n\n${message}`);
+      Alert.alert('Restore Failed', 'Could not read the selected file.');
     }
   }
 
@@ -131,17 +98,17 @@ export function SettingsScreen() {
         <Text style={typography.label}>BACKUP</Text>
         <Card>
           <SettingsRow
-            icon="database-export-outline"
-            label="Export DB File"
-            description="Save all your data as a .json backup file"
-            onPress={handleExportDb}
+            icon="shield-lock-outline"
+            label="Backup"
+            description="Save an encrypted, password-protected backup of your data"
+            onPress={handleBackup}
           />
           <View style={styles.divider} />
           <SettingsRow
-            icon="database-import-outline"
-            label="Import DB File"
-            description="Restore your data from a previously exported .json backup"
-            onPress={handleImportDb}
+            icon="backup-restore"
+            label="Restore"
+            description="Restore your data from an encrypted backup"
+            onPress={handleRestore}
           />
         </Card>
 
@@ -149,9 +116,9 @@ export function SettingsScreen() {
         <Card>
           <SettingsRow
             icon="microsoft-excel"
-            label="Export to Excel"
-            description="Save all your data as a multi-sheet .xlsx file"
-            onPress={handleExport}
+            label="Export Transactions to Excel"
+            description="Save your transactions as a .xlsx file"
+            onPress={handleExportTransactions}
           />
         </Card>
 

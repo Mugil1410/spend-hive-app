@@ -8,6 +8,7 @@ export type BottomTabParamList = {
   Accounts: undefined;
   Categories: undefined;
   Cashbook: undefined;
+  Events: undefined;
   Settings: undefined;
   Preferences: undefined;
 };
@@ -18,11 +19,16 @@ export type DrawerParamList = {
 
 export type RootStackParamList = {
   Drawer: undefined;
-  QuickAdd: { transactionId?: string; type?: TransactionType } | undefined;
+  QuickAdd: { transactionId?: string; type?: TransactionType; eventId?: string } | undefined;
   AccountForm: { accountId?: string } | undefined;
   CategoryForm: { categoryId?: string; type?: 'EXPENSE' | 'INCOME' } | undefined;
   CashbookForm: { type: CashbookType; entryId?: string };
   CashbookEntryDetail: { entryId: string };
   RecordPayment: { entryId: string; installmentId: string };
   FilteredTransactions: { accountId?: string; categoryId?: string; title: string };
+  Debtors: undefined;
+  DebtorForm: { debtorId?: string } | undefined;
+  BackupPassword: { mode: 'backup' | 'restore' };
+  EventForm: { eventId?: string } | undefined;
+  EventDetail: { eventId: string };
 };

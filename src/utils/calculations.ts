@@ -14,6 +14,29 @@ export function computeAccountBalance(account: Account, transactions: Transactio
   return balance;
 }
 
+// Batched version of computeAccountBalance: one pass over all transactions instead
+// of one pass per account, so rendering a full account list stays O(accounts + transactions)
+// rather than O(accounts * transactions).
+export function computeAllAccountBalances(accounts: Account[], transactions: Transaction[]): Map<string, number> {
+  const balances = new Map<string, number>();
+  for (const account of accounts) {
+    balances.set(account.id, account.initialBalance);
+  }
+  for (const tx of transactions) {
+    if (tx.type === 'EXPENSE' && balances.has(tx.accountId)) {
+      balances.set(tx.accountId, balances.get(tx.accountId)! - tx.amount);
+    } else if (tx.type === 'INCOME' && balances.has(tx.accountId)) {
+      balances.set(tx.accountId, balances.get(tx.accountId)! + tx.amount);
+    } else if (tx.type === 'TRANSFER') {
+      if (balances.has(tx.accountId)) balances.set(tx.accountId, balances.get(tx.accountId)! - tx.amount);
+      if (tx.toAccountId && balances.has(tx.toAccountId)) {
+        balances.set(tx.toAccountId, balances.get(tx.toAccountId)! + tx.amount);
+      }
+    }
+  }
+  return balances;
+}
+
 export function filterTransactionsInRange(transactions: Transaction[], range: DateRange): Transaction[] {
   return transactions.filter((t) => isDateInRange(t.date, range));
 }

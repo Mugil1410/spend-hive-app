@@ -122,11 +122,6 @@ export function RecordsScreen() {
                     <View style={styles.accountBadge}>
                       <Text style={styles.accountBadgeText}>{account?.name ?? '—'}</Text>
                     </View>
-                    {!!item.note && (
-                      <Text style={typography.caption} numberOfLines={1}>
-                        {item.note}
-                      </Text>
-                    )}
                   </View>
                 </View>
                 <Text

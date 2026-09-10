@@ -14,6 +14,7 @@ const Drawer = createDrawerNavigator<DrawerParamList>();
 
 const MENU_ITEMS: { route: keyof BottomTabParamList; label: string; icon: string }[] = [
   { route: 'Cashbook', label: 'Cashbook', icon: 'handshake-outline' },
+  { route: 'Events', label: 'Events', icon: 'party-popper' },
   { route: 'Preferences', label: 'Preference', icon: 'tune-variant' },
   { route: 'Settings', label: 'Settings', icon: 'cog-outline' },
 ];

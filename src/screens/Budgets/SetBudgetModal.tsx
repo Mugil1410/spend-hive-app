@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { NumPad } from '@/components/NumPad';
@@ -18,7 +19,8 @@ interface Props {
 
 export function SetBudgetModal({ visible, category, initialValue, onClose, onSave }: Props) {
   const { colors, typography } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
   const { raw, numericValue, handleKey, reset } = useAmountInput(initialValue ? String(initialValue) : '0');
   const currencySymbol = useCurrencySymbol();
 
@@ -58,7 +60,7 @@ export function SetBudgetModal({ visible, category, initialValue, onClose, onSav
   );
 }
 
-function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
+function createStyles(colors: ReturnType<typeof useTheme>['colors'], bottomInset: number) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
     card: {
@@ -68,6 +70,7 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderWidth: 1,
       borderColor: colors.border,
       padding: 18,
+      paddingBottom: Math.max(18, bottomInset + 12),
     },
     header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     amountText: { textAlign: 'center', fontSize: 36, fontWeight: '700', color: colors.gold, marginVertical: 16 },

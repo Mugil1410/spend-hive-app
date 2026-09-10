@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
+import { FormScreen } from '@/components/FormScreen';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { AccountType } from '@/types';
@@ -49,18 +49,12 @@ export function AccountFormModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={typography.h2}>{editingId ? 'Edit Account' : 'New Account'}</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave}>
-          <Text style={[styles.save, !canSave && { opacity: 0.4 }]}>Save</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.body}>
+    <FormScreen
+      title={editingId ? 'Edit Account' : 'New Account'}
+      onCancel={() => navigation.goBack()}
+      onSave={handleSave}
+      saveDisabled={!canSave}
+    >
         <Text style={typography.label}>NAME</Text>
         <TextInput
           style={styles.input}
@@ -121,26 +115,12 @@ export function AccountFormModal() {
             <Text style={{ color: colors.expense, fontWeight: '700' }}>Archive Account</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </FormScreen>
   );
 }
 
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.separator,
-    },
-    cancel: { color: colors.textSecondary, fontSize: 14 },
-    save: { color: colors.gold, fontSize: 14, fontWeight: '700' },
-    body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
     input: {
       marginTop: 8,
       paddingVertical: 10,

@@ -11,6 +11,11 @@ import { CashbookFormModal } from '@/screens/Modals/CashbookFormModal';
 import { CashbookEntryDetailScreen } from '@/screens/Cashbook/CashbookEntryDetailScreen';
 import { RecordPaymentModal } from '@/screens/Modals/RecordPaymentModal';
 import { FilteredTransactionsScreen } from '@/screens/Records/FilteredTransactionsScreen';
+import { DebtorsScreen } from '@/screens/Cashbook/DebtorsScreen';
+import { DebtorFormModal } from '@/screens/Modals/DebtorFormModal';
+import { EventFormModal } from '@/screens/Modals/EventFormModal';
+import { EventDetailScreen } from '@/screens/Events/EventDetailScreen';
+import { BackupPasswordModal } from '@/screens/Modals/BackupPasswordModal';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -51,6 +56,11 @@ export function RootNavigator() {
           <Stack.Screen name="CashbookEntryDetail" component={CashbookEntryDetailScreen} />
           <Stack.Screen name="RecordPayment" component={RecordPaymentModal} />
           <Stack.Screen name="FilteredTransactions" component={FilteredTransactionsScreen} />
+          <Stack.Screen name="Debtors" component={DebtorsScreen} />
+          <Stack.Screen name="DebtorForm" component={DebtorFormModal} />
+          <Stack.Screen name="EventForm" component={EventFormModal} />
+          <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+          <Stack.Screen name="BackupPassword" component={BackupPasswordModal} />
         </Stack.Group>
       </Stack.Navigator>
     </NavigationContainer>

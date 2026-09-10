@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
+import { FormScreen } from '@/components/FormScreen';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { CategoryType } from '@/types';
+import { suggestLabels } from '@/utils/suggestions';
 
 const ICONS = [
   'film', 'silverware-fork-knife', 'file-document', 'bus', 'shopping', 'heart-pulse',
@@ -24,13 +25,29 @@ export function CategoryFormModal() {
   const route = useRoute<RouteProp<RootStackParamList, 'CategoryForm'>>();
   const editingId = route.params?.categoryId;
 
-  const { categories, addCategory, updateCategory, deleteCategory } = useStore();
+  const { categories, transactions, addCategory, updateCategory, deleteCategory } = useStore();
   const editing = editingId ? categories.find((c) => c.id === editingId) : undefined;
 
   const [name, setName] = useState(editing?.name ?? '');
   const [type, setType] = useState<CategoryType>(editing?.type ?? route.params?.type ?? 'EXPENSE');
   const [icon, setIcon] = useState(editing?.icon ?? ICONS[0]);
   const [color, setColor] = useState(editing?.color ?? COLORS[0]);
+
+  const categoryLastUsed = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of transactions) {
+      const prev = map.get(t.categoryId);
+      if (!prev || t.date > prev) map.set(t.categoryId, t.date);
+    }
+    return map;
+  }, [transactions]);
+
+  const nameSuggestions = useMemo(() => {
+    const items = categories
+      .filter((c) => c.type === type && c.id !== editingId)
+      .map((c) => ({ label: c.name, lastUsedAt: categoryLastUsed.get(c.id) }));
+    return suggestLabels(name, items);
+  }, [categories, type, editingId, categoryLastUsed, name]);
 
   const canSave = name.trim().length > 0;
 
@@ -51,18 +68,12 @@ export function CategoryFormModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={typography.h2}>{editingId ? 'Edit Category' : 'New Category'}</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave}>
-          <Text style={[styles.save, !canSave && { opacity: 0.4 }]}>Save</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.body}>
+    <FormScreen
+      title={editingId ? 'Edit Category' : 'New Category'}
+      onCancel={() => navigation.goBack()}
+      onSave={handleSave}
+      saveDisabled={!canSave}
+    >
         <Text style={typography.label}>NAME</Text>
         <TextInput
           style={styles.input}
@@ -71,6 +82,16 @@ export function CategoryFormModal() {
           placeholder="e.g. Travel"
           placeholderTextColor={colors.textSecondary}
         />
+        {nameSuggestions.length > 0 && (
+          <View style={styles.suggestions}>
+            {nameSuggestions.map((label) => (
+              <TouchableOpacity key={label} style={styles.suggestionRow} onPress={() => setName(label)}>
+                <MaterialCommunityIcons name="tag-outline" size={16} color={colors.textSecondary} />
+                <Text style={typography.body}>Already have "{label}"?</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <Text style={[typography.label, { marginTop: 16 }]}>TYPE</Text>
         <View style={styles.pillsRow}>
@@ -114,26 +135,12 @@ export function CategoryFormModal() {
             <Text style={{ color: colors.expense, fontWeight: '700' }}>Delete Category</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </FormScreen>
   );
 }
 
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.separator,
-    },
-    cancel: { color: colors.textSecondary, fontSize: 14 },
-    save: { color: colors.gold, fontSize: 14, fontWeight: '700' },
-    body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
     input: {
       marginTop: 8,
       paddingVertical: 10,
@@ -144,6 +151,15 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderColor: colors.border,
       color: colors.textPrimary,
     },
+    suggestions: {
+      marginTop: 4,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
     pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
     pill: {
       paddingVertical: 8,

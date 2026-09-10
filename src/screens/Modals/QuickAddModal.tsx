@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
+import { FormScreen } from '@/components/FormScreen';
 import { NumPad } from '@/components/NumPad';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { SelectSheet, SelectOption } from '@/components/SelectSheet';
@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 
 const TYPES: TransactionType[] = ['EXPENSE', 'INCOME', 'TRANSFER'];
 
-type ActiveSheet = 'category' | 'account' | 'toAccount' | null;
+type ActiveSheet = 'category' | 'account' | 'toAccount' | 'event' | null;
 
 export function QuickAddModal() {
   const { colors, typography } = useTheme();
@@ -37,7 +37,7 @@ export function QuickAddModal() {
   const route = useRoute<RouteProp<RootStackParamList, 'QuickAdd'>>();
   const editingId = route.params?.transactionId;
 
-  const { transactions, categories, accounts, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const { transactions, categories, accounts, events, addTransaction, updateTransaction, deleteTransaction } = useStore();
   const editingTx = editingId ? transactions.find((t) => t.id === editingId) : undefined;
 
   const [type, setType] = useState<TransactionType>(editingTx?.type ?? route.params?.type ?? 'EXPENSE');
@@ -45,6 +45,7 @@ export function QuickAddModal() {
   const [categoryId, setCategoryId] = useState<string | undefined>(editingTx?.categoryId);
   const [accountId, setAccountId] = useState<string | undefined>(editingTx?.accountId ?? accounts[0]?.id);
   const [toAccountId, setToAccountId] = useState<string | undefined>(editingTx?.toAccountId ?? accounts[1]?.id);
+  const [eventId, setEventId] = useState<string | undefined>(editingTx?.eventId ?? route.params?.eventId);
   const [date, setDate] = useState(editingTx ? new Date(editingTx.date) : new Date());
   const [note, setNote] = useState(editingTx?.note ?? '');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -52,19 +53,35 @@ export function QuickAddModal() {
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
 
   const visibleCategories = useMemo(
-    () => categories.filter((c) => c.type === (type === 'INCOME' ? 'INCOME' : 'EXPENSE')),
+    () =>
+      categories
+        .filter((c) => c.type === (type === 'INCOME' ? 'INCOME' : 'EXPENSE'))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [categories, type]
   );
-  const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts]);
+  const activeAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts]
+  );
   const toAccountOptions = useMemo(() => activeAccounts.filter((a) => a.id !== accountId), [activeAccounts, accountId]);
+
+  const activeEvents = useMemo(
+    () => events.filter((e) => !e.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [events]
+  );
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedAccount = accounts.find((a) => a.id === accountId);
   const selectedToAccount = accounts.find((a) => a.id === toAccountId);
+  const selectedEvent = events.find((e) => e.id === eventId);
 
   const categoryOptions: SelectOption[] = visibleCategories.map((c) => ({ id: c.id, label: c.name, icon: c.icon, color: c.color }));
   const accountOptions: SelectOption[] = activeAccounts.map((a) => ({ id: a.id, label: a.name, icon: a.icon, color: a.color }));
   const toAccountSelectOptions: SelectOption[] = toAccountOptions.map((a) => ({ id: a.id, label: a.name, icon: a.icon, color: a.color }));
+  const eventOptions: SelectOption[] = [
+    { id: '', label: 'No event' },
+    ...activeEvents.map((e) => ({ id: e.id, label: e.name, icon: e.icon, color: e.color })),
+  ];
 
   const canSave =
     numericValue > 0 &&
@@ -79,6 +96,7 @@ export function QuickAddModal() {
       categoryId: type === 'TRANSFER' ? '' : categoryId!,
       accountId,
       toAccountId: type === 'TRANSFER' ? toAccountId : undefined,
+      eventId: type === 'TRANSFER' ? undefined : eventId,
       date: date.toISOString(),
       note: note.trim() || undefined,
     };
@@ -98,37 +116,35 @@ export function QuickAddModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={typography.h2}>{editingId ? 'Edit Transaction' : 'Add Transaction'}</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave}>
-          <Text style={[styles.save, !canSave && { opacity: 0.4 }]}>Save</Text>
-        </TouchableOpacity>
-      </View>
+    <FormScreen
+      title={editingId ? 'Edit Transaction' : 'Add Transaction'}
+      onCancel={() => navigation.goBack()}
+      onSave={handleSave}
+      saveDisabled={!canSave}
+      footer={<NumPad onKeyPress={handleKey} />}
+      beforeContent={
+        <>
+          <View style={styles.typeSelector}>
+            {TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.typePill, type === t && { backgroundColor: TYPE_COLORS[t] }]}
+                onPress={() => {
+                  setType(t);
+                  setCategoryId(undefined);
+                }}
+              >
+                <Text style={[styles.typePillText, type === t && { color: colors.background, fontWeight: '700' }]}>
+                  {t}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-      <View style={styles.typeSelector}>
-        {TYPES.map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.typePill, type === t && { backgroundColor: TYPE_COLORS[t] }]}
-            onPress={() => {
-              setType(t);
-              setCategoryId(undefined);
-            }}
-          >
-            <Text style={[styles.typePillText, type === t && { color: colors.background, fontWeight: '700' }]}>
-              {t}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={[styles.amountText, { color: TYPE_COLORS[type] }]}>{currencySymbol}{raw}</Text>
-
-      <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 12 }}>
+          <Text style={[styles.amountText, { color: TYPE_COLORS[type] }]}>{currencySymbol}{raw}</Text>
+        </>
+      }
+    >
         {type !== 'TRANSFER' ? (
           <View style={styles.fieldColumns}>
             <View style={styles.fieldColumn}>
@@ -177,6 +193,19 @@ export function QuickAddModal() {
           </View>
         )}
 
+        {type !== 'TRANSFER' && activeEvents.length > 0 && (
+          <>
+            <Text style={[typography.label, { marginTop: 16 }]}>EVENT (OPTIONAL)</Text>
+            <DropdownField
+              placeholder="No event"
+              icon={selectedEvent?.icon}
+              color={selectedEvent?.color}
+              value={selectedEvent?.name}
+              onPress={() => setActiveSheet('event')}
+            />
+          </>
+        )}
+
         <Text style={[typography.label, { marginTop: 16 }]}>DATE</Text>
         <TouchableOpacity style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
           <MaterialCommunityIcons name="calendar" size={18} color={colors.textSecondary} />
@@ -222,9 +251,6 @@ export function QuickAddModal() {
             <Text style={{ color: colors.expense, fontWeight: '700' }}>Delete Transaction</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
-
-      <NumPad onKeyPress={handleKey} />
 
       <SelectSheet
         visible={activeSheet === 'category'}
@@ -253,7 +279,15 @@ export function QuickAddModal() {
         onSelect={setToAccountId}
         onClose={() => setActiveSheet(null)}
       />
-    </SafeAreaView>
+      <SelectSheet
+        visible={activeSheet === 'event'}
+        title="Select Event"
+        options={eventOptions}
+        selectedId={eventId ?? ''}
+        onSelect={(id) => setEventId(id || undefined)}
+        onClose={() => setActiveSheet(null)}
+      />
+    </FormScreen>
   );
 }
 
@@ -291,15 +325,10 @@ function DropdownField({
 
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.separator },
-    cancel: { color: colors.textSecondary, fontSize: 14 },
-    save: { color: colors.gold, fontSize: 14, fontWeight: '700' },
     typeSelector: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
     typePill: { flex: 1, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
     typePillText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
     amountText: { textAlign: 'center', fontSize: 40, fontWeight: '700', marginVertical: 16 },
-    body: { flex: 1, paddingHorizontal: 16 },
     fieldColumns: { flexDirection: 'row', gap: 12 },
     fieldColumn: { flex: 1, minWidth: 0 },
     fieldRow: {

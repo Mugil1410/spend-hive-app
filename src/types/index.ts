@@ -9,7 +9,8 @@ export interface Transaction {
   toAccountId?: string; // For transfers
   date: string; // ISO string
   note?: string;
-  cashbookRef?: { entryId: string; installmentId: string }; // set when auto-created from Cashbook
+  eventId?: string;
+  cashbookRef?: { entryId: string; installmentId?: string }; // set when auto-created from Cashbook
 }
 
 export type AccountType = 'CASH' | 'CARD' | 'SAVINGS' | 'CUSTOM';
@@ -57,10 +58,28 @@ export interface CashbookEntry {
   id: string;
   type: CashbookType;
   contactName: string;
+  debtorId?: string;
+  accountId?: string; // account the loan/lent amount was given from/into, chosen at creation
   totalAmount: number;
   installments: CashbookInstallment[];
   createdAt: string;
   note?: string;
+}
+
+export interface Debtor {
+  id: string;
+  name: string;
+  nameKey: string; // trimmed + lowercased, used for case-insensitive dedup
+  createdAt: string;
+  archived?: boolean;
+}
+
+export interface Event {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  archived?: boolean;
 }
 
 export type DisplayRange =

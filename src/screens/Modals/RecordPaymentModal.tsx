@@ -5,6 +5,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
+import { FormScreen } from '@/components/FormScreen';
 import { NumPad } from '@/components/NumPad';
 import { useAmountInput } from '@/utils/useAmountInput';
 import { useCurrencySymbol } from '@/utils/currency';
@@ -26,7 +27,13 @@ export function RecordPaymentModal() {
 
   const { raw, numericValue, handleKey } = useAmountInput(remaining > 0 ? remaining.toFixed(2) : '0');
   const currencySymbol = useCurrencySymbol();
-  const [accountId, setAccountId] = useState<string | undefined>(accounts.find((a) => !a.archived)?.id);
+  const sortedAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts]
+  );
+  const [accountId, setAccountId] = useState<string | undefined>(
+    (entry?.accountId && sortedAccounts.some((a) => a.id === entry.accountId) ? entry.accountId : sortedAccounts[0]?.id)
+  );
 
   if (!entry || !installment) {
     return (
@@ -46,18 +53,16 @@ export function RecordPaymentModal() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={typography.h2}>Record Payment</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!canSave}>
-          <Text style={[styles.save, !canSave && { opacity: 0.4 }]}>Confirm</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={[typography.caption, { paddingHorizontal: 16, marginTop: 8 }]}>
+    <FormScreen
+      title="Record Payment"
+      onCancel={() => navigation.goBack()}
+      onSave={handleSave}
+      saveLabel="Confirm"
+      saveDisabled={!canSave}
+      footer={<NumPad onKeyPress={handleKey} />}
+      scrollViewProps={{ contentContainerStyle: { paddingHorizontal: 0 } }}
+    >
+      <Text style={[typography.caption, { paddingHorizontal: 16 }]}>
         {entry.type === 'LOAN' ? 'Paying' : 'Collecting from'} {entry.contactName} · Remaining {formatCurrency(remaining)}
       </Text>
 
@@ -66,8 +71,7 @@ export function RecordPaymentModal() {
       <View style={styles.body}>
         <Text style={typography.label}>{entry.type === 'LOAN' ? 'PAY FROM ACCOUNT' : 'RECEIVE INTO ACCOUNT'}</Text>
         <View style={styles.pillsRow}>
-          {accounts
-            .filter((a) => !a.archived)
+          {sortedAccounts
             .map((a) => (
               <TouchableOpacity
                 key={a.id}
@@ -79,26 +83,13 @@ export function RecordPaymentModal() {
             ))}
         </View>
       </View>
-
-      <NumPad onKeyPress={handleKey} />
-    </SafeAreaView>
+    </FormScreen>
   );
 }
 
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, paddingTop: 4 },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.separator,
-    },
-    cancel: { color: colors.textSecondary, fontSize: 14 },
-    save: { color: colors.gold, fontSize: 14, fontWeight: '700' },
     amountText: { textAlign: 'center', fontSize: 40, fontWeight: '700', marginVertical: 16 },
     body: { flex: 1, paddingHorizontal: 16 },
     pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },

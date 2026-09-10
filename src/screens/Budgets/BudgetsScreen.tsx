@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { subMonths } from 'date-fns';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { DateNavigator } from '@/components/DateNavigator';
@@ -16,12 +18,15 @@ import { formatCurrency } from '@/utils/formatCurrency';
 export function BudgetsScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { categories, budgets, transactions, setBudget } = useStore();
+  const { categories, budgets, transactions, setBudget, copyBudgetsForward } = useStore();
   const [anchor, setAnchor] = useState(new Date());
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   const period = periodKeyForMonth(anchor);
-  const expenseCategories = categories.filter((c) => c.type === 'EXPENSE');
+  const expenseCategories = useMemo(
+    () => categories.filter((c) => c.type === 'EXPENSE').sort((a, b) => a.name.localeCompare(b.name)),
+    [categories]
+  );
 
   const budgeted = useMemo(
     () =>
@@ -41,10 +46,36 @@ export function BudgetsScreen() {
   const totalBudget = budgeted.reduce((s, b) => s + b.limit, 0);
   const totalSpent = budgeted.reduce((s, b) => s + b.spent, 0);
 
+  function handleCopyPreviousMonth() {
+    const previousPeriod = periodKeyForMonth(subMonths(anchor, 1));
+    const hasExisting = budgets.some((b) => b.period === period);
+    const hasPrevious = budgets.some((b) => b.period === previousPeriod);
+    if (!hasPrevious) {
+      Alert.alert('Nothing to Copy', 'The previous month has no budget entries.');
+      return;
+    }
+    if (hasExisting) {
+      Alert.alert(
+        'Copy Previous Month?',
+        'Current month already has budget entries. Do you want to copy the previous month\'s budget?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Copy & Overwrite', style: 'destructive', onPress: () => copyBudgetsForward(previousPeriod, period) },
+        ]
+      );
+      return;
+    }
+    copyBudgetsForward(previousPeriod, period);
+  }
+
   return (
     <View style={styles.container}>
       <TopHeader title="Budgets" />
       <DateNavigator anchor={anchor} range="MONTHLY" onChange={setAnchor} />
+      <TouchableOpacity style={styles.copyButton} onPress={handleCopyPreviousMonth} hitSlop={8}>
+        <MaterialCommunityIcons name="content-copy" size={16} color={colors.gold} />
+        <Text style={{ color: colors.gold, fontWeight: '700', fontSize: 12 }}>Copy previous month</Text>
+      </TouchableOpacity>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 12 }}>
         <Card>
@@ -111,6 +142,15 @@ export function BudgetsScreen() {
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    copyButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-end',
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      paddingBottom: 8,
+    },
     summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     notBudgetedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     setBudgetButton: {

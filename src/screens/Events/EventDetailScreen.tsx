@@ -9,29 +9,37 @@ import { useTheme } from '@/theme/ThemeContext';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { SummaryCard } from '@/components/SummaryCard';
+import { FAB } from '@/components/FAB';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { sumByType } from '@/utils/calculations';
 import { formatSignedAmount } from '@/utils/formatCurrency';
 import { format } from 'date-fns';
 
-export function FilteredTransactionsScreen() {
+export function EventDetailScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const route = useRoute<RouteProp<RootStackParamList, 'FilteredTransactions'>>();
-  const { accountId, categoryId, title } = route.params;
+  const route = useRoute<RouteProp<RootStackParamList, 'EventDetail'>>();
+  const { eventId } = route.params;
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { transactions, categories, accounts, deleteTransaction } = useStore();
+  const { events, transactions, categories, accounts, deleteTransaction } = useStore();
+  const event = events.find((e) => e.id === eventId);
 
   const filtered = useMemo(() => {
-    const list = transactions.filter((t) =>
-      accountId ? t.accountId === accountId || t.toAccountId === accountId : t.categoryId === categoryId
-    );
+    const list = transactions.filter((t) => t.eventId === eventId);
     return [...list].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, accountId, categoryId]);
+  }, [transactions, eventId]);
 
   const expense = sumByType(filtered, 'EXPENSE');
   const income = sumByType(filtered, 'INCOME');
+
+  if (!event) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={typography.body}>Event not found.</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -39,8 +47,10 @@ export function FilteredTransactionsScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="chevron-left" size={26} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={typography.h2}>{title}</Text>
-        <View style={{ width: 26 }} />
+        <Text style={typography.h2}>{event.name}</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('EventForm', { eventId: event.id })}>
+          <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.gold} />
+        </TouchableOpacity>
       </View>
 
       <SummaryCard expense={expense} income={income} />
@@ -49,8 +59,10 @@ export function FilteredTransactionsScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         style={{ marginTop: 8 }}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        ListEmptyComponent={<EmptyState icon="notebook-outline" message="No transactions found." />}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        ListEmptyComponent={
+          <EmptyState icon="notebook-outline" message="No transactions tagged with this event yet." />
+        }
         renderItem={({ item }) => {
           const category = categories.find((c) => c.id === item.categoryId);
           const account = accounts.find((a) => a.id === item.accountId);
@@ -94,6 +106,8 @@ export function FilteredTransactionsScreen() {
           );
         }}
       />
+
+      <FAB onPress={() => navigation.navigate('QuickAdd', { eventId: event.id })} />
     </SafeAreaView>
   );
 }

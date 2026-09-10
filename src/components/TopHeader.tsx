@@ -9,9 +9,10 @@ interface Props {
   title: string;
   onSearchPress?: () => void;
   onFilterPress?: () => void;
+  onPersonPress?: () => void;
 }
 
-export function TopHeader({ title, onSearchPress, onFilterPress }: Props) {
+export function TopHeader({ title, onSearchPress, onFilterPress, onPersonPress }: Props) {
   const navigation = useNavigation();
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -25,6 +26,11 @@ export function TopHeader({ title, onSearchPress, onFilterPress }: Props) {
           {title}
         </Text>
         <View style={styles.actions}>
+          {onPersonPress && (
+            <TouchableOpacity onPress={onPersonPress} hitSlop={10}>
+              <MaterialCommunityIcons name="account-multiple-outline" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
           {onSearchPress && (
             <TouchableOpacity onPress={onSearchPress} hitSlop={10}>
               <MaterialCommunityIcons name="magnify" size={24} color={colors.textPrimary} />
