@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useDrawerStatus } from '@react-navigation/drawer';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeContext';
@@ -69,21 +71,36 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 }
 
 export function BottomTabNavigator() {
+  const navigation = useNavigation();
+  // react-native-drawer-layout's backdrop toggles its pointerEvents via an animated prop,
+  // which doesn't always reach the native side on Android, so its "tap outside to close"
+  // silently stops hit-testing. This transparent catcher sits on top of the tab content
+  // (below the actual drawer panel) and closes the drawer itself whenever it's open.
+  const drawerStatus = useDrawerStatus();
+
   return (
-    <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tab.Screen name="Records" component={RecordsScreen} />
-      <Tab.Screen name="Analysis" component={AnalysisScreen} />
-      <Tab.Screen name="Budgets" component={BudgetsScreen} />
-      <Tab.Screen name="Accounts" component={AccountsScreen} />
-      <Tab.Screen name="Categories" component={CategoriesScreen} />
-      <Tab.Screen name="Cashbook" component={CashbookScreen} />
-      <Tab.Screen name="Events" component={EventsScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
-      <Tab.Screen name="Preferences" component={PreferencesScreen} />
-    </Tab.Navigator>
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
+      >
+        <Tab.Screen name="Records" component={RecordsScreen} options={{ title: 'Transactions' }} />
+        <Tab.Screen name="Analysis" component={AnalysisScreen} />
+        <Tab.Screen name="Budgets" component={BudgetsScreen} />
+        <Tab.Screen name="Accounts" component={AccountsScreen} />
+        <Tab.Screen name="Categories" component={CategoriesScreen} />
+        <Tab.Screen name="Cashbook" component={CashbookScreen} />
+        <Tab.Screen name="Events" component={EventsScreen} />
+        <Tab.Screen name="Settings" component={SettingsScreen} />
+        <Tab.Screen name="Preferences" component={PreferencesScreen} />
+      </Tab.Navigator>
+      {drawerStatus === 'open' && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => navigation.dispatch(DrawerActions.closeDrawer())}
+        />
+      )}
+    </View>
   );
 }
 

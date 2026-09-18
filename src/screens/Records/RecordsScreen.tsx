@@ -11,7 +11,7 @@ import { SummaryCard } from '@/components/SummaryCard';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { FAB } from '@/components/FAB';
 import { EmptyState } from '@/components/EmptyState';
-import { DisplayOptionsModal } from '@/components/DisplayOptionsModal';
+import { TransactionFilterModal, TransactionFilters, DEFAULT_TRANSACTION_FILTERS, isTransactionFilterActive } from '@/components/TransactionFilterModal';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { DisplayOptions, Transaction } from '@/types';
@@ -30,19 +30,43 @@ export function RecordsScreen() {
   const [filterVisible, setFilterVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [query, setQuery] = useState('');
+  const [txFilters, setTxFilters] = useState<TransactionFilters>(DEFAULT_TRANSACTION_FILTERS);
 
   const range = useMemo(() => getRangeForAnchor(anchor, displayOptions.range), [anchor, displayOptions.range]);
 
   const inRange = useMemo(() => filterTransactionsInRange(transactions, range), [transactions, range]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return inRange;
-    const q = query.toLowerCase();
-    return inRange.filter((t) => {
-      const category = categories.find((c) => c.id === t.categoryId);
-      return (t.note ?? '').toLowerCase().includes(q) || (category?.name ?? '').toLowerCase().includes(q);
-    });
-  }, [inRange, query, categories]);
+    let list = inRange;
+
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      list = list.filter((t) => {
+        const category = categories.find((c) => c.id === t.categoryId);
+        return (t.note ?? '').toLowerCase().includes(q) || (category?.name ?? '').toLowerCase().includes(q);
+      });
+    }
+
+    if (txFilters.categoryIds.length > 0) {
+      list = list.filter((t) => txFilters.categoryIds.includes(t.categoryId));
+    }
+
+    const min = parseFloat(txFilters.minAmount);
+    if (!Number.isNaN(min)) list = list.filter((t) => t.amount >= min);
+    const max = parseFloat(txFilters.maxAmount);
+    if (!Number.isNaN(max)) list = list.filter((t) => t.amount <= max);
+
+    if (txFilters.dateFrom) {
+      const from = new Date(txFilters.dateFrom).setHours(0, 0, 0, 0);
+      list = list.filter((t) => new Date(t.date).getTime() >= from);
+    }
+    if (txFilters.dateTo) {
+      const to = new Date(txFilters.dateTo).setHours(23, 59, 59, 999);
+      list = list.filter((t) => new Date(t.date).getTime() <= to);
+    }
+
+    return list;
+  }, [inRange, query, categories, txFilters]);
 
   const expense = sumByType(inRange, 'EXPENSE');
   const income = sumByType(inRange, 'INCOME');
@@ -64,9 +88,10 @@ export function RecordsScreen() {
   return (
     <View style={styles.container}>
       <TopHeader
-        title="Records"
+        title="Transactions"
         onSearchPress={() => setSearchVisible((v) => !v)}
         onFilterPress={() => setFilterVisible(true)}
+        filterActive={isTransactionFilterActive(txFilters)}
       />
       {searchVisible && (
         <View style={styles.searchBar}>
@@ -91,7 +116,16 @@ export function RecordsScreen() {
         renderSectionHeader={({ section }) => (
           <Text style={styles.sectionHeader}>{section.title}</Text>
         )}
-        ListEmptyComponent={<EmptyState icon="notebook-outline" message="No transactions in this period." />}
+        ListEmptyComponent={
+          <EmptyState
+            icon="notebook-outline"
+            message={
+              isTransactionFilterActive(txFilters) || query.trim()
+                ? 'No transactions match your filters.'
+                : 'No transactions in this period.'
+            }
+          />
+        }
         renderItem={({ item }) => {
           const category = categories.find((c) => c.id === item.categoryId);
           const account = accounts.find((a) => a.id === item.accountId);
@@ -138,10 +172,13 @@ export function RecordsScreen() {
         }}
       />
 
-      <DisplayOptionsModal
+      <TransactionFilterModal
         visible={filterVisible}
-        value={displayOptions}
-        onChange={setDisplayOptions}
+        displayOptions={displayOptions}
+        onDisplayOptionsChange={setDisplayOptions}
+        categories={categories}
+        filters={txFilters}
+        onFiltersChange={setTxFilters}
         onClose={() => setFilterVisible(false)}
       />
 

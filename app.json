@@ -34,7 +34,7 @@
               "label": "SpendHive Quick Add",
               "description": "Quickly add an expense or income",
               "minWidth": "250dp",
-              "minHeight": "140dp",
+              "minHeight": "64dp",
               "resizeMode": "horizontal|vertical"
             }
           ]

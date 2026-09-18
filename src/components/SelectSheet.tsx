@@ -11,6 +11,7 @@ export interface SelectOption {
   label: string;
   icon?: string;
   color?: string;
+  subtitle?: string;
 }
 
 interface Props {
@@ -47,9 +48,12 @@ export function SelectSheet({ visible, title, options, selectedId, onSelect, onC
                   }}
                 >
                   {item.icon && item.color ? <CategoryIcon icon={item.icon} color={item.color} size={36} /> : null}
-                  <Text style={[typography.body, styles.rowLabel, active && { color: colors.gold, fontWeight: '700' }]}>
-                    {item.label}
-                  </Text>
+                  <View style={styles.rowLabel}>
+                    <Text style={[typography.body, active && { color: colors.gold, fontWeight: '700' }]}>
+                      {item.label}
+                    </Text>
+                    {item.subtitle ? <Text style={typography.caption}>{item.subtitle}</Text> : null}
+                  </View>
                   {active ? <MaterialCommunityIcons name="check" size={20} color={colors.gold} /> : null}
                 </TouchableOpacity>
               );

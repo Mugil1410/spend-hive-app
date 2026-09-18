@@ -15,6 +15,8 @@ import { useCurrencySymbol } from '@/utils/currency';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { TransactionType } from '@/types';
+import { computeAccountBalance } from '@/utils/calculations';
+import { formatCurrency } from '@/utils/formatCurrency';
 import { format } from 'date-fns';
 
 const TYPES: TransactionType[] = ['EXPENSE', 'INCOME', 'TRANSFER'];
@@ -51,6 +53,7 @@ export function QuickAddModal() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const [noteFocused, setNoteFocused] = useState(false);
 
   const visibleCategories = useMemo(
     () =>
@@ -76,8 +79,20 @@ export function QuickAddModal() {
   const selectedEvent = events.find((e) => e.id === eventId);
 
   const categoryOptions: SelectOption[] = visibleCategories.map((c) => ({ id: c.id, label: c.name, icon: c.icon, color: c.color }));
-  const accountOptions: SelectOption[] = activeAccounts.map((a) => ({ id: a.id, label: a.name, icon: a.icon, color: a.color }));
-  const toAccountSelectOptions: SelectOption[] = toAccountOptions.map((a) => ({ id: a.id, label: a.name, icon: a.icon, color: a.color }));
+  const accountOptions: SelectOption[] = activeAccounts.map((a) => ({
+    id: a.id,
+    label: a.name,
+    icon: a.icon,
+    color: a.color,
+    subtitle: formatCurrency(computeAccountBalance(a, transactions)),
+  }));
+  const toAccountSelectOptions: SelectOption[] = toAccountOptions.map((a) => ({
+    id: a.id,
+    label: a.name,
+    icon: a.icon,
+    color: a.color,
+    subtitle: formatCurrency(computeAccountBalance(a, transactions)),
+  }));
   const eventOptions: SelectOption[] = [
     { id: '', label: 'No event' },
     ...activeEvents.map((e) => ({ id: e.id, label: e.name, icon: e.icon, color: e.color })),
@@ -121,7 +136,7 @@ export function QuickAddModal() {
       onCancel={() => navigation.goBack()}
       onSave={handleSave}
       saveDisabled={!canSave}
-      footer={<NumPad onKeyPress={handleKey} />}
+      footer={noteFocused ? undefined : <NumPad onKeyPress={handleKey} />}
       beforeContent={
         <>
           <View style={styles.typeSelector}>
@@ -244,6 +259,8 @@ export function QuickAddModal() {
           placeholderTextColor={colors.textSecondary}
           value={note}
           onChangeText={setNote}
+          onFocus={() => setNoteFocused(true)}
+          onBlur={() => setNoteFocused(false)}
         />
 
         {editingId && (

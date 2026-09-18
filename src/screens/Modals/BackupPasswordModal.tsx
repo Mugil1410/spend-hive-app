@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View } from 'react-native';
+import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View, Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,6 +21,25 @@ import { takePendingRestoreText } from '@/utils/pendingRestore';
 import { format } from 'date-fns';
 
 const MIN_PASSWORD_LENGTH = 6;
+
+/**
+ * Lets the user pick a folder (Android's Storage Access Framework folder picker doubles as the
+ * permission prompt) and writes the backup there directly. Returns false if the user cancels or
+ * the picker/write fails, so the caller can fall back to the sandboxed file + share sheet.
+ */
+async function saveToChosenFolder(baseName: string, contents: string): Promise<boolean> {
+  try {
+    const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!permission.granted) return false;
+
+    const fileUri = await StorageAccessFramework.createFileAsync(permission.directoryUri, baseName, 'application/json');
+    await StorageAccessFramework.writeAsStringAsync(fileUri, contents);
+    Alert.alert('Backup Saved', 'Your encrypted backup was saved to the selected folder.');
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function BackupPasswordModal() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -67,19 +87,26 @@ export function BackupPasswordModal() {
         notificationSettings,
       });
       const container = await encryptBackup(json, password, DB_BACKUP_VERSION);
-      const fileName = `spendhive-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.spendhivebackup`;
-      const file = new File(Paths.document, fileName);
-      file.create({ overwrite: true });
-      file.write(JSON.stringify(container));
+      const contents = JSON.stringify(container);
+      const baseName = `spendhive-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}`;
+      const fileName = `${baseName}.spendhivebackup`;
 
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Save SpendHive Backup',
-        });
-      } else {
-        Alert.alert('Backup Saved', `Saved to ${file.uri}`);
+      const savedToFolder = Platform.OS === 'android' && (await saveToChosenFolder(baseName, contents));
+
+      if (!savedToFolder) {
+        const file = new File(Paths.document, fileName);
+        file.create({ overwrite: true });
+        file.write(contents);
+
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(file.uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Save SpendHive Backup',
+          });
+        } else {
+          Alert.alert('Backup Saved', `Saved to ${file.uri}`);
+        }
       }
       navigation.goBack();
     } catch (e) {

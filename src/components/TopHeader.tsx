@@ -10,9 +10,10 @@ interface Props {
   onSearchPress?: () => void;
   onFilterPress?: () => void;
   onPersonPress?: () => void;
+  filterActive?: boolean;
 }
 
-export function TopHeader({ title, onSearchPress, onFilterPress, onPersonPress }: Props) {
+export function TopHeader({ title, onSearchPress, onFilterPress, onPersonPress, filterActive }: Props) {
   const navigation = useNavigation();
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -38,7 +39,11 @@ export function TopHeader({ title, onSearchPress, onFilterPress, onPersonPress }
           )}
           {onFilterPress && (
             <TouchableOpacity onPress={onFilterPress} hitSlop={10}>
-              <MaterialCommunityIcons name="tune-variant" size={22} color={colors.textPrimary} />
+              <MaterialCommunityIcons
+                name="tune-variant"
+                size={22}
+                color={filterActive ? colors.gold : colors.textPrimary}
+              />
             </TouchableOpacity>
           )}
         </View>

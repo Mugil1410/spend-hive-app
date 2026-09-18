@@ -1,7 +1,7 @@
 'use no memo';
 
 import React from 'react';
-import { FlexWidget, TextWidget, SvgWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, SvgWidget, ImageWidget } from 'react-native-android-widget';
 
 const colors = {
   surface: '#343330',
@@ -19,9 +19,7 @@ const ICON_INCOME =
 const ICON_EXPENSE =
   '<svg viewBox="0 0 24 24"><path d="M12 20l-7-7h4V4h6v9h4z" fill="#FFFFFF"/></svg>';
 const ICON_TRANSFER =
-  '<svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3 1.4-1.4L21.8 8 16.4 13.4 15 12l3-3H7zM17 17H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11z" fill="#262523"/></svg>';
-const ICON_INSERT =
-  '<svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" fill="#262523"/></svg>';
+  '<svg viewBox="0 0 24 24"><path d="M8 3l3 4H9v10H7V7H5z" fill="#262523"/><path d="M16 21l-3-4h2V7h2v10h2z" fill="#262523"/></svg>';
 
 function TypeButton({
   type,
@@ -38,15 +36,15 @@ function TypeButton({
       clickActionData={{ uri: `spendhive://quickadd?type=${type}` }}
       accessibilityLabel={`Add ${type.toLowerCase()}`}
       style={{
-        flex: 1,
-        width: 'match_parent',
+        width: 40,
+        height: 40,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor,
-        borderRadius: 14,
+        borderRadius: 20,
       }}
     >
-      <SvgWidget svg={icon} style={{ width: 20, height: 20 }} />
+      <SvgWidget svg={icon} style={{ width: 18, height: 18 }} />
     </FlexWidget>
   );
 }
@@ -59,44 +57,38 @@ export function QuickAddWidget() {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         backgroundColor: colors.surface,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: colors.border,
-        padding: 10,
-        flexGap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
       }}
     >
       <FlexWidget
+        clickAction="OPEN_APP"
         style={{
-          width: 64,
-          height: 'match_parent',
-          flexDirection: 'column',
+          flexDirection: 'row',
+          alignItems: 'center',
           flexGap: 8,
         }}
       >
+        <ImageWidget
+          image={require('../../assets/app-logo.png')}
+          imageWidth={30}
+          imageHeight={30}
+          radius={8}
+          resizeMode="contain"
+        />
+        <TextWidget text="SpendHive" style={{ fontSize: 15, fontWeight: 'bold', color: colors.textPrimary }} />
+      </FlexWidget>
+
+      <FlexWidget style={{ flexDirection: 'row', flexGap: 8 }}>
         <TypeButton type="INCOME" backgroundColor={colors.income} icon={ICON_INCOME} />
         <TypeButton type="EXPENSE" backgroundColor={colors.expense} icon={ICON_EXPENSE} />
         <TypeButton type="TRANSFER" backgroundColor={colors.gold} icon={ICON_TRANSFER} />
-      </FlexWidget>
-
-      <FlexWidget
-        clickAction="OPEN_URI"
-        clickActionData={{ uri: 'spendhive://quickadd' }}
-        accessibilityLabel="Insert transaction"
-        style={{
-          flex: 1,
-          height: 'match_parent',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: colors.gold,
-          borderRadius: 16,
-          flexGap: 6,
-        }}
-      >
-        <SvgWidget svg={ICON_INSERT} style={{ width: 26, height: 26 }} />
-        <TextWidget text="Insert" style={{ fontSize: 13, fontWeight: 'bold', color: colors.background }} />
       </FlexWidget>
     </FlexWidget>
   );
