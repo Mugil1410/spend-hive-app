@@ -26,21 +26,6 @@
       "expo-font",
       "expo-asset",
       [
-        "react-native-android-widget",
-        {
-          "widgets": [
-            {
-              "name": "QuickAdd",
-              "label": "SpendHive Quick Add",
-              "description": "Quickly add an expense or income",
-              "minWidth": "250dp",
-              "minHeight": "64dp",
-              "resizeMode": "horizontal|vertical"
-            }
-          ]
-        }
-      ],
-      [
         "expo-splash-screen",
         {
           "image": "./assets/app-icon.png",

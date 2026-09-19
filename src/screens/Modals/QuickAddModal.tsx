@@ -8,7 +8,7 @@ import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
 import { NumPad } from '@/components/NumPad';
-import { CategoryIcon } from '@/components/CategoryIcon';
+import { DropdownField } from '@/components/DropdownField';
 import { SelectSheet, SelectOption } from '@/components/SelectSheet';
 import { useAmountInput } from '@/utils/useAmountInput';
 import { useCurrencySymbol } from '@/utils/currency';
@@ -53,7 +53,6 @@ export function QuickAddModal() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
-  const [noteFocused, setNoteFocused] = useState(false);
 
   const visibleCategories = useMemo(
     () =>
@@ -69,7 +68,7 @@ export function QuickAddModal() {
   const toAccountOptions = useMemo(() => activeAccounts.filter((a) => a.id !== accountId), [activeAccounts, accountId]);
 
   const activeEvents = useMemo(
-    () => events.filter((e) => !e.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    () => events.filter((e) => !e.archived && !e.completed).sort((a, b) => a.name.localeCompare(b.name)),
     [events]
   );
 
@@ -136,7 +135,7 @@ export function QuickAddModal() {
       onCancel={() => navigation.goBack()}
       onSave={handleSave}
       saveDisabled={!canSave}
-      footer={noteFocused ? undefined : <NumPad onKeyPress={handleKey} />}
+      footer={<NumPad onKeyPress={handleKey} />}
       beforeContent={
         <>
           <View style={styles.typeSelector}>
@@ -259,8 +258,6 @@ export function QuickAddModal() {
           placeholderTextColor={colors.textSecondary}
           value={note}
           onChangeText={setNote}
-          onFocus={() => setNoteFocused(true)}
-          onBlur={() => setNoteFocused(false)}
         />
 
         {editingId && (
@@ -308,38 +305,6 @@ export function QuickAddModal() {
   );
 }
 
-function DropdownField({
-  value,
-  placeholder,
-  icon,
-  color,
-  onPress,
-}: {
-  value?: string;
-  placeholder: string;
-  icon?: string;
-  color?: string;
-  onPress: () => void;
-}) {
-  const { colors, typography } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <TouchableOpacity style={styles.fieldRow} onPress={onPress}>
-      <View style={styles.fieldRowLeft}>
-        {icon && color ? <CategoryIcon icon={icon} color={color} size={28} /> : null}
-        <Text
-          style={[typography.body, !value && { color: colors.textSecondary }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {value ?? placeholder}
-        </Text>
-      </View>
-      <MaterialCommunityIcons name="chevron-down" size={18} color={colors.textSecondary} />
-    </TouchableOpacity>
-  );
-}
-
 function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
   return StyleSheet.create({
     typeSelector: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
@@ -348,19 +313,6 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
     amountText: { textAlign: 'center', fontSize: 40, fontWeight: '700', marginVertical: 16 },
     fieldColumns: { flexDirection: 'row', gap: 12 },
     fieldColumn: { flex: 1, minWidth: 0 },
-    fieldRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 8,
-      paddingVertical: 10,
-      paddingHorizontal: 10,
-      backgroundColor: colors.surface,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    fieldRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
     dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
     noteInput: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary },
     deleteButton: { alignItems: 'center', marginTop: 20, paddingVertical: 10 },

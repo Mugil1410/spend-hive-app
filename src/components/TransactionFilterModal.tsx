@@ -5,11 +5,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
-import { CategoryIcon } from './CategoryIcon';
-import { DisplayOptions, DisplayRange, Category } from '@/types';
+import { DropdownField } from './DropdownField';
+import { SelectSheet, SelectOption } from './SelectSheet';
+import { DisplayOptions, DisplayRange, Category, Account } from '@/types';
 
 export interface TransactionFilters {
-  categoryIds: string[];
+  categoryId?: string;
+  accountId?: string;
   minAmount: string;
   maxAmount: string;
   dateFrom?: string; // ISO
@@ -17,14 +19,16 @@ export interface TransactionFilters {
 }
 
 export const DEFAULT_TRANSACTION_FILTERS: TransactionFilters = {
-  categoryIds: [],
+  categoryId: undefined,
+  accountId: undefined,
   minAmount: '',
   maxAmount: '',
 };
 
 export function isTransactionFilterActive(filters: TransactionFilters): boolean {
   return (
-    filters.categoryIds.length > 0 ||
+    !!filters.categoryId ||
+    !!filters.accountId ||
     filters.minAmount.trim() !== '' ||
     filters.maxAmount.trim() !== '' ||
     !!filters.dateFrom ||
@@ -46,16 +50,20 @@ interface Props {
   displayOptions: DisplayOptions;
   onDisplayOptionsChange: (value: DisplayOptions) => void;
   categories: Category[];
+  accounts: Account[];
   filters: TransactionFilters;
   onFiltersChange: (value: TransactionFilters) => void;
   onClose: () => void;
 }
+
+type ActiveSheet = 'category' | 'account' | null;
 
 export function TransactionFilterModal({
   visible,
   displayOptions,
   onDisplayOptionsChange,
   categories,
+  accounts,
   filters,
   onFiltersChange,
   onClose,
@@ -63,22 +71,33 @@ export function TransactionFilterModal({
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [datePickerTarget, setDatePickerTarget] = useState<'from' | 'to' | null>(null);
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
 
   const sortedCategories = useMemo(() => [...categories].sort((a, b) => a.name.localeCompare(b.name)), [categories]);
+  const sortedAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived).sort((a, b) => a.name.localeCompare(b.name)),
+    [accounts]
+  );
 
-  function toggleCategory(id: string) {
-    const next = filters.categoryIds.includes(id)
-      ? filters.categoryIds.filter((c) => c !== id)
-      : [...filters.categoryIds, id];
-    onFiltersChange({ ...filters, categoryIds: next });
-  }
+  const selectedCategory = categories.find((c) => c.id === filters.categoryId);
+  const selectedAccount = accounts.find((a) => a.id === filters.accountId);
+
+  const categoryOptions: SelectOption[] = [
+    { id: '', label: 'All Categories' },
+    ...sortedCategories.map((c) => ({ id: c.id, label: c.name, icon: c.icon, color: c.color })),
+  ];
+  const accountOptions: SelectOption[] = [
+    { id: '', label: 'All Accounts' },
+    ...sortedAccounts.map((a) => ({ id: a.id, label: a.name, icon: a.icon, color: a.color })),
+  ];
 
   function handleClear() {
     onFiltersChange(DEFAULT_TRANSACTION_FILTERS);
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card}>
           <View style={styles.headerRow}>
@@ -116,23 +135,28 @@ export function TransactionFilterModal({
               />
             </View>
 
-            <Text style={[typography.label, styles.sectionLabel]}>CATEGORY</Text>
-            <View style={styles.grid}>
-              {sortedCategories.map((c) => {
-                const active = filters.categoryIds.includes(c.id);
-                return (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[styles.categoryChip, active && { borderColor: colors.gold }]}
-                    onPress={() => toggleCategory(c.id)}
-                  >
-                    <CategoryIcon icon={c.icon} color={c.color} size={22} />
-                    <Text style={[typography.body, styles.categoryChipText, active && { color: colors.gold, fontWeight: '700' }]}>
-                      {c.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Text style={[typography.label, styles.sectionLabel]}>ACCOUNT &amp; CATEGORY</Text>
+            <View style={styles.fieldColumns}>
+              <View style={styles.fieldColumn}>
+                <Text style={typography.label}>ACCOUNT</Text>
+                <DropdownField
+                  placeholder="All Accounts"
+                  icon={selectedAccount?.icon}
+                  color={selectedAccount?.color}
+                  value={selectedAccount?.name}
+                  onPress={() => setActiveSheet('account')}
+                />
+              </View>
+              <View style={styles.fieldColumn}>
+                <Text style={typography.label}>CATEGORY</Text>
+                <DropdownField
+                  placeholder="All Categories"
+                  icon={selectedCategory?.icon}
+                  color={selectedCategory?.color}
+                  value={selectedCategory?.name}
+                  onPress={() => setActiveSheet('category')}
+                />
+              </View>
             </View>
 
             <Text style={[typography.label, styles.sectionLabel]}>AMOUNT</Text>
@@ -207,7 +231,25 @@ export function TransactionFilterModal({
           }}
         />
       )}
-    </Modal>
+      </Modal>
+
+      <SelectSheet
+        visible={activeSheet === 'category'}
+        title="Select Category"
+        options={categoryOptions}
+        selectedId={filters.categoryId ?? ''}
+        onSelect={(id) => onFiltersChange({ ...filters, categoryId: id || undefined })}
+        onClose={() => setActiveSheet(null)}
+      />
+      <SelectSheet
+        visible={activeSheet === 'account'}
+        title="Select Account"
+        options={accountOptions}
+        selectedId={filters.accountId ?? ''}
+        onSelect={(id) => onFiltersChange({ ...filters, accountId: id || undefined })}
+        onClose={() => setActiveSheet(null)}
+      />
+    </>
   );
 }
 
@@ -243,17 +285,8 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderTopWidth: 1,
       borderTopColor: colors.separator,
     },
-    categoryChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    categoryChipText: { fontSize: 12 },
+    fieldColumns: { flexDirection: 'row', gap: 12 },
+    fieldColumn: { flex: 1, minWidth: 0 },
     amountRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     amountInput: {
       flex: 1,

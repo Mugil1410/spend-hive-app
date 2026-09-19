@@ -80,6 +80,7 @@ export interface Event {
   icon: string;
   color: string;
   archived?: boolean;
+  completed?: boolean;
 }
 
 export type DisplayRange =

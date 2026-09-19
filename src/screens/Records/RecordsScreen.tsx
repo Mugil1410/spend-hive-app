@@ -47,8 +47,11 @@ export function RecordsScreen() {
       });
     }
 
-    if (txFilters.categoryIds.length > 0) {
-      list = list.filter((t) => txFilters.categoryIds.includes(t.categoryId));
+    if (txFilters.categoryId) {
+      list = list.filter((t) => t.categoryId === txFilters.categoryId);
+    }
+    if (txFilters.accountId) {
+      list = list.filter((t) => t.accountId === txFilters.accountId || t.toAccountId === txFilters.accountId);
     }
 
     const min = parseFloat(txFilters.minAmount);
@@ -177,6 +180,7 @@ export function RecordsScreen() {
         displayOptions={displayOptions}
         onDisplayOptionsChange={setDisplayOptions}
         categories={categories}
+        accounts={accounts}
         filters={txFilters}
         onFiltersChange={setTxFilters}
         onClose={() => setFilterVisible(false)}

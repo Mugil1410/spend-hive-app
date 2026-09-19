@@ -22,7 +22,7 @@ export function EventDetailScreen() {
   const { eventId } = route.params;
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { events, transactions, categories, accounts, deleteTransaction } = useStore();
+  const { events, transactions, categories, accounts, deleteTransaction, updateEvent } = useStore();
   const event = events.find((e) => e.id === eventId);
 
   const filtered = useMemo(() => {
@@ -48,10 +48,26 @@ export function EventDetailScreen() {
           <MaterialCommunityIcons name="chevron-left" size={26} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={typography.h2}>{event.name}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('EventForm', { eventId: event.id })}>
-          <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.gold} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => updateEvent(event.id, { completed: !event.completed })}>
+            <MaterialCommunityIcons
+              name={event.completed ? 'check-circle' : 'checkbox-blank-circle-outline'}
+              size={22}
+              color={event.completed ? colors.income : colors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('EventForm', { eventId: event.id })}>
+            <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.gold} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {event.completed && (
+        <View style={styles.completedBanner}>
+          <MaterialCommunityIcons name="check-circle" size={16} color={colors.income} />
+          <Text style={[typography.caption, { color: colors.income }]}>Marked as complete</Text>
+        </View>
+      )}
 
       <SummaryCard expense={expense} income={income} />
 
@@ -123,6 +139,14 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       paddingVertical: 12,
       borderBottomWidth: 1,
       borderBottomColor: colors.separator,
+    },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    completedBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingTop: 10,
     },
     row: {
       flexDirection: 'row',

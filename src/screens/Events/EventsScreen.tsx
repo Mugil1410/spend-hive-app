@@ -17,43 +17,62 @@ export function EventsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { events, transactions } = useStore();
+  const { events, transactions, updateEvent } = useStore();
 
-  const activeEvents = useMemo(
+  const nonArchivedEvents = useMemo(
     () => events.filter((e) => !e.archived).sort((a, b) => a.name.localeCompare(b.name)),
     [events]
   );
+  const activeEvents = useMemo(() => nonArchivedEvents.filter((e) => !e.completed), [nonArchivedEvents]);
+  const completedEvents = useMemo(() => nonArchivedEvents.filter((e) => e.completed), [nonArchivedEvents]);
+
+  function renderEvent(event: (typeof nonArchivedEvents)[number]) {
+    const eventTx = transactions.filter((t) => t.eventId === event.id);
+    const expense = sumByType(eventTx, 'EXPENSE');
+    const income = sumByType(eventTx, 'INCOME');
+    return (
+      <TouchableOpacity
+        key={event.id}
+        style={styles.row}
+        onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+      >
+        <TouchableOpacity hitSlop={8} onPress={() => updateEvent(event.id, { completed: !event.completed })}>
+          <MaterialCommunityIcons
+            name={event.completed ? 'check-circle' : 'checkbox-blank-circle-outline'}
+            size={22}
+            color={event.completed ? colors.income : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <CategoryIcon icon={event.icon} color={event.color} size={44} />
+        <View style={{ flex: 1 }}>
+          <Text style={[typography.body, event.completed && { color: colors.textSecondary, textDecorationLine: 'line-through' }]}>
+            {event.name}
+          </Text>
+          <Text style={typography.caption}>
+            Expense {formatCurrency(expense)} · Income {formatCurrency(income)}
+          </Text>
+        </View>
+        <TouchableOpacity hitSlop={8} onPress={() => navigation.navigate('EventForm', { eventId: event.id })}>
+          <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <TopHeader title="Events" />
-      {activeEvents.length === 0 ? (
+      {nonArchivedEvents.length === 0 ? (
         <EmptyState icon="party-popper" message="No events yet. Create one to track a trip, wedding, or project separately." />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-          {activeEvents.map((event) => {
-            const eventTx = transactions.filter((t) => t.eventId === event.id);
-            const expense = sumByType(eventTx, 'EXPENSE');
-            const income = sumByType(eventTx, 'INCOME');
-            return (
-              <TouchableOpacity
-                key={event.id}
-                style={styles.row}
-                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-              >
-                <CategoryIcon icon={event.icon} color={event.color} size={44} />
-                <View style={{ flex: 1 }}>
-                  <Text style={typography.body}>{event.name}</Text>
-                  <Text style={typography.caption}>
-                    Expense {formatCurrency(expense)} · Income {formatCurrency(income)}
-                  </Text>
-                </View>
-                <TouchableOpacity hitSlop={8} onPress={() => navigation.navigate('EventForm', { eventId: event.id })}>
-                  <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          })}
+          {activeEvents.map(renderEvent)}
+          {completedEvents.length > 0 && (
+            <>
+              <Text style={[typography.label, { marginTop: activeEvents.length > 0 ? 8 : 0 }]}>COMPLETED</Text>
+              {completedEvents.map(renderEvent)}
+            </>
+          )}
         </ScrollView>
       )}
       <FAB onPress={() => navigation.navigate('EventForm', undefined)} />

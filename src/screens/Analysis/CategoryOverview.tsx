@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
 import { ProgressBar } from '@/components/ProgressBar';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { EmptyState } from '@/components/EmptyState';
 import { CategoryTotal } from '@/utils/calculations';
 import { formatCurrency } from '@/utils/formatCurrency';
+import { RootStackParamList } from '@/navigation/types';
 
 interface Props {
   totals: CategoryTotal[];
@@ -16,6 +19,7 @@ interface Props {
 
 export function CategoryOverview({ totals, grandTotal, accentColor }: Props) {
   const { colors, typography } = useTheme();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   if (totals.length === 0) {
     return <EmptyState icon="chart-donut" message="No transactions to analyze in this period." />;
   }
@@ -42,7 +46,12 @@ export function CategoryOverview({ totals, grandTotal, accentColor }: Props) {
 
       <View style={{ gap: 14, marginTop: 20 }}>
         {totals.map((t) => (
-          <View key={t.category.id}>
+          <TouchableOpacity
+            key={t.category.id}
+            onPress={() =>
+              navigation.navigate('FilteredTransactions', { categoryId: t.category.id, title: t.category.name })
+            }
+          >
             <View style={styles.row}>
               <CategoryIcon icon={t.category.icon} color={t.category.color} size={32} />
               <View style={{ flex: 1 }}>
@@ -56,7 +65,7 @@ export function CategoryOverview({ totals, grandTotal, accentColor }: Props) {
               </View>
               <Text style={[typography.caption, { width: 40, textAlign: 'right' }]}>{t.percent.toFixed(0)}%</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
     </View>
