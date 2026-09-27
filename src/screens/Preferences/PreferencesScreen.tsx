@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/theme/ThemeContext';
@@ -8,6 +8,12 @@ import { Card } from '@/components/Card';
 import { SelectSheet, SelectOption } from '@/components/SelectSheet';
 import { useStore, ThemeMode } from '@/store/useStore';
 import { CURRENCIES } from '@/utils/currency';
+import {
+  requestNotificationPermission,
+  canScheduleExactAlarms,
+  openAlarmPermissionSettings,
+  openNotificationSettings,
+} from '@/notifications/scheduler';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -29,6 +35,38 @@ export function PreferencesScreen() {
     label: `${c.label} (${c.symbol})`,
   }));
   const selectedCurrency = CURRENCIES.find((c) => c.code === currency);
+
+  async function handleToggleNotifications(enabled: boolean) {
+    if (!enabled) {
+      updateNotificationSettings({ enabled: false });
+      return;
+    }
+
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert(
+        'Notifications Blocked',
+        'SpendHive needs permission to show reminders. Allow notifications in the app settings.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openNotificationSettings() },
+        ]
+      );
+      return;
+    }
+    updateNotificationSettings({ enabled: true });
+
+    if (!(await canScheduleExactAlarms())) {
+      Alert.alert(
+        'Allow On-Time Reminders',
+        'To deliver reminders at the exact time you chose, allow "Alarms & reminders" for SpendHive. Without it, Android may deliver them a little late.',
+        [
+          { text: 'Skip', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openAlarmPermissionSettings() },
+        ]
+      );
+    }
+  }
 
   const [hour, minute] = notificationSettings.dailyReminderTime.split(':').map((n) => parseInt(n, 10));
   const timeValue = new Date();
@@ -78,7 +116,7 @@ export function PreferencesScreen() {
             label="Enable Notifications"
             description="Master switch for all reminders below"
             value={notificationSettings.enabled}
-            onChange={(v) => updateNotificationSettings({ enabled: v })}
+            onChange={handleToggleNotifications}
           />
         </Card>
 
@@ -87,7 +125,7 @@ export function PreferencesScreen() {
           <ToggleRow
             icon="cash-minus"
             label="Loan Due Reminder"
-            description="Notify when a loan payment is due"
+            description="Notify on the due date of each unpaid loan installment"
             value={notificationSettings.loanDueEnabled}
             onChange={(v) => updateNotificationSettings({ loanDueEnabled: v })}
             disabled={!notificationSettings.enabled}
@@ -96,7 +134,7 @@ export function PreferencesScreen() {
           <ToggleRow
             icon="cash-plus"
             label="Lent Due Reminder"
-            description="Notify when a payment is due to collect"
+            description="Notify on the due date of each payment you're owed"
             value={notificationSettings.lentDueEnabled}
             onChange={(v) => updateNotificationSettings({ lentDueEnabled: v })}
             disabled={!notificationSettings.enabled}
@@ -110,7 +148,9 @@ export function PreferencesScreen() {
             onChange={(v) => updateNotificationSettings({ dailyReminderEnabled: v })}
             disabled={!notificationSettings.enabled}
           />
-          {notificationSettings.dailyReminderEnabled && (
+          {(notificationSettings.dailyReminderEnabled ||
+            notificationSettings.loanDueEnabled ||
+            notificationSettings.lentDueEnabled) && (
             <>
               <View style={styles.divider} />
               <TouchableOpacity
@@ -121,7 +161,7 @@ export function PreferencesScreen() {
                 <MaterialCommunityIcons name="clock-outline" size={22} color={colors.gold} />
                 <View style={{ flex: 1 }}>
                   <Text style={typography.body}>Reminder Time</Text>
-                  <Text style={typography.caption}>Daily at this time</Text>
+                  <Text style={typography.caption}>Daily and due-date reminders fire at this time</Text>
                 </View>
                 <Text style={[typography.body, { color: colors.gold, fontWeight: '700' }]}>
                   {formatTime(hour, minute)}

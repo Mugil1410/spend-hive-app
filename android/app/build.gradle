@@ -72,6 +72,11 @@ def enableProguardInReleaseBuilds = true
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// App version comes from package.json ("version": "MAJOR.MINOR.PATCH") - the single place to bump it.
+// versionCode = MAJOR*10000 + MINOR*100 + PATCH, e.g. 1.1.32 -> 10132 (always increases with the version).
+def appVersionName = new groovy.json.JsonSlurper().parseText(file("../../package.json").text).version
+def appVersionCode = appVersionName.tokenize('.').collect { it.toInteger() }.with { it[0] * 10000 + it[1] * 100 + it[2] }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,8 +87,8 @@ android {
         applicationId "com.spendhive"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
     }
     signingConfigs {
         debug {
@@ -115,7 +120,7 @@ android {
         }
     }
     // Name APKs <applicationId>_<timestamp>[_debug].apk, e.g. com.spendhive_20260927-1830.apk
-    def buildTimestamp = new Date().format("yyyyMMdd-HHmm")
+    def buildTimestamp = new Date().format("yyyyMMddHHmm")
     applicationVariants.all { variant ->
         variant.outputs.all {
             def suffix = variant.buildType.name == "release" ? "" : "_${variant.buildType.name}"

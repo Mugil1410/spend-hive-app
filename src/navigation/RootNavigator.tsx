@@ -3,6 +3,8 @@ import { NavigationContainer, DefaultTheme, LinkingOptions } from '@react-naviga
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
 import { RootStackParamList } from './types';
+import { navigationRef } from './navigationRef';
+import { handleNavigationReady } from '@/notifications/notificationTaps';
 import { DrawerNavigator } from './DrawerNavigator';
 import { QuickAddModal } from '@/screens/Modals/QuickAddModal';
 import { AccountFormModal } from '@/screens/Modals/AccountFormModal';
@@ -45,7 +47,7 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking} onReady={handleNavigationReady}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Drawer" component={DrawerNavigator} />
         <Stack.Group screenOptions={{ ...TransitionPresets.ModalSlideFromBottomIOS, presentation: 'modal' }}>

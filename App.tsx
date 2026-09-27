@@ -7,9 +7,11 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AppSplashScreen } from '@/components/AppSplashScreen';
 import { useStore } from '@/store/useStore';
+import { useNotifications } from '@/notifications/useNotifications';
 
 function AppContent() {
   const { colors, scheme } = useTheme();
+  useNotifications();
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
