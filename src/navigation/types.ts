@@ -28,7 +28,8 @@ export type RootStackParamList = {
   FilteredTransactions: { accountId?: string; categoryId?: string; title: string };
   Debtors: undefined;
   DebtorForm: { debtorId?: string } | undefined;
-  BackupPassword: { mode: 'backup' | 'restore' };
+  // Only used to unlock legacy password-protected backups.
+  BackupPassword: undefined;
   EventForm: { eventId?: string } | undefined;
   EventDetail: { eventId: string };
 };

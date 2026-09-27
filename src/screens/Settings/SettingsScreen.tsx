@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import RNFS from 'react-native-fs';
+import { openDocumentTree, writeFile as safWriteFile } from 'react-native-saf-x';
 import Share from 'react-native-share';
 import { pick, keepLocalCopy, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import { useNavigation } from '@react-navigation/native';
@@ -13,7 +14,36 @@ import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { buildTransactionsCsv } from '@/utils/exportCsv';
 import { setPendingRestoreText } from '@/utils/pendingRestore';
+import { buildDbBackupJson, parseDbBackupJson, DbBackup } from '@/utils/dbBackup';
 import { format } from 'date-fns';
+
+/**
+ * Lets the user pick a folder (Android's Storage Access Framework folder picker doubles as the
+ * permission prompt) and writes the backup there directly. Returns false if the user cancels or
+ * the picker/write fails, so the caller can fall back to the sandboxed file + share sheet.
+ */
+async function saveToChosenFolder(fileName: string, contents: string): Promise<boolean> {
+  try {
+    const dir = await openDocumentTree(true);
+    if (!dir) return false;
+
+    await safWriteFile(`${dir.uri}/${fileName}`, contents, { mimeType: 'application/json' });
+    Alert.alert('Backup Saved', 'Your backup was saved to the selected folder.');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function tryParsePlainBackup(text: string): DbBackup | null {
+  try {
+    const data = JSON.parse(text.replace(/^﻿/, ''));
+    if (data?.container === 'spendhive-encrypted-backup') return null;
+    return parseDbBackupJson(JSON.stringify(data));
+  } catch {
+    return null;
+  }
+}
 
 export function SettingsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -26,8 +56,13 @@ export function SettingsScreen() {
     events,
     cashbookEntries,
     debtors,
+    budgets,
+    themeMode,
+    currency,
+    notificationSettings,
     resetAllData,
     deleteAllTransactions,
+    importData,
   } = useStore();
 
   async function handleExportTransactions() {
@@ -52,8 +87,39 @@ export function SettingsScreen() {
     }
   }
 
-  function handleBackup() {
-    navigation.navigate('BackupPassword', { mode: 'backup' });
+  async function handleBackup() {
+    try {
+      const json = buildDbBackupJson({
+        accounts,
+        categories,
+        transactions,
+        budgets,
+        cashbookEntries,
+        debtors,
+        events,
+        themeMode,
+        currency,
+        notificationSettings,
+      });
+      const baseName = `spendhive-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}`;
+
+      if (Platform.OS === 'android' && (await saveToChosenFolder(`${baseName}.json`, json))) return;
+
+      const filePath = `${RNFS.DocumentDirectoryPath}/${baseName}.json`;
+      await RNFS.writeFile(filePath, json, 'utf8');
+      try {
+        await Share.open({
+          url: `file://${filePath}`,
+          type: 'application/json',
+          title: 'Save SpendHive Backup',
+          failOnCancel: false,
+        });
+      } catch {
+        Alert.alert('Backup Saved', `Saved to ${filePath}`);
+      }
+    } catch {
+      Alert.alert('Backup Failed', 'Could not create the backup.');
+    }
   }
 
   async function handleRestore() {
@@ -71,8 +137,30 @@ export function SettingsScreen() {
       }
 
       const text = await RNFS.readFile(copy.localUri, 'utf8');
+
+      // Plain JSON backups restore directly; only legacy encrypted backups need a password.
+      const plain = tryParsePlainBackup(text);
+      if (plain) {
+        Alert.alert(
+          'Restore Backup',
+          `This will replace all current data with the backup (${plain.transactions.length} transactions, ${plain.accounts.length} accounts). Continue?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Restore',
+              style: 'destructive',
+              onPress: () => {
+                importData(plain);
+                Alert.alert('Restore Complete', 'Your data has been restored from the backup.');
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       setPendingRestoreText(text);
-      navigation.navigate('BackupPassword', { mode: 'restore' });
+      navigation.navigate('BackupPassword');
     } catch (e) {
       if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) return;
       Alert.alert('Restore Failed', 'Could not read the selected file.');
@@ -104,16 +192,16 @@ export function SettingsScreen() {
         <Text style={typography.label}>BACKUP</Text>
         <Card>
           <SettingsRow
-            icon="shield-lock-outline"
+            icon="content-save-outline"
             label="Backup"
-            description="Save an encrypted, password-protected backup of your data"
+            description="Save a backup file of your data"
             onPress={handleBackup}
           />
           <View style={styles.divider} />
           <SettingsRow
             icon="backup-restore"
             label="Restore"
-            description="Restore your data from an encrypted backup"
+            description="Restore your data from a backup file"
             onPress={handleRestore}
           />
         </Card>

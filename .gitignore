@@ -29,7 +29,13 @@ android/captures/
 *.mobileprovision
 
 # Personal financial data / DB dumps — never commit real user data
+database/
 *.db
+*.db-shm
+*.db-wal
+spendhive-backup-*
+*.decrypted.json
+spendhive-transactions-*.csv
 spendhive-import*.json
 spendhive-db-*.json
 spendhive-export-*.xlsx

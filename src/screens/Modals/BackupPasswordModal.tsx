@@ -1,119 +1,32 @@
 import React, { useMemo, useState } from 'react';
-import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View, Platform } from 'react-native';
-import RNFS from 'react-native-fs';
-import { openDocumentTree, writeFile as safWriteFile } from 'react-native-saf-x';
-import Share from 'react-native-share';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
-import { buildDbBackupJson, parseDbBackupJson, DB_BACKUP_VERSION } from '@/utils/dbBackup';
+import { parseDbBackupJson } from '@/utils/dbBackup';
 import {
-  encryptBackup,
   decryptBackup,
   parseEncryptedBackupContainer,
   BackupFormatError,
   BackupPasswordError,
 } from '@/utils/backupCrypto';
 import { takePendingRestoreText } from '@/utils/pendingRestore';
-import { format } from 'date-fns';
-
-const MIN_PASSWORD_LENGTH = 6;
 
 /**
- * Lets the user pick a folder (Android's Storage Access Framework folder picker doubles as the
- * permission prompt) and writes the backup there directly. Returns false if the user cancels or
- * the picker/write fails, so the caller can fall back to the sandboxed file + share sheet.
+ * Unlocks a legacy password-protected backup (made by older app versions). New backups are
+ * plain JSON and restore straight from Settings without this screen.
  */
-async function saveToChosenFolder(baseName: string, contents: string): Promise<boolean> {
-  try {
-    const dir = await openDocumentTree(true);
-    if (!dir) return false;
-
-    await safWriteFile(`${dir.uri}/${baseName}`, contents, { mimeType: 'application/json' });
-    Alert.alert('Backup Saved', 'Your encrypted backup was saved to the selected folder.');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function BackupPasswordModal() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const route = useRoute<RouteProp<RootStackParamList, 'BackupPassword'>>();
-  const { mode } = route.params;
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  const {
-    accounts,
-    categories,
-    transactions,
-    budgets,
-    cashbookEntries,
-    debtors,
-    events,
-    themeMode,
-    currency,
-    notificationSettings,
-    importData,
-  } = useStore();
+  const importData = useStore((s) => s.importData);
 
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const canSave =
-    !busy &&
-    password.length >= MIN_PASSWORD_LENGTH &&
-    (mode === 'restore' || password === confirmPassword);
-
-  async function handleBackup() {
-    setBusy(true);
-    try {
-      const json = buildDbBackupJson({
-        accounts,
-        categories,
-        transactions,
-        budgets,
-        cashbookEntries,
-        debtors,
-        events,
-        themeMode,
-        currency,
-        notificationSettings,
-      });
-      const container = await encryptBackup(json, password, DB_BACKUP_VERSION);
-      const contents = JSON.stringify(container);
-      const baseName = `spendhive-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}`;
-      const fileName = `${baseName}.spendhivebackup`;
-
-      const savedToFolder = Platform.OS === 'android' && (await saveToChosenFolder(baseName, contents));
-
-      if (!savedToFolder) {
-        const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        await RNFS.writeFile(filePath, contents, 'utf8');
-
-        try {
-          await Share.open({
-            url: `file://${filePath}`,
-            type: 'application/json',
-            title: 'Save SpendHive Backup',
-            failOnCancel: false,
-          });
-        } catch {
-          Alert.alert('Backup Saved', `Saved to ${filePath}`);
-        }
-      }
-      navigation.goBack();
-    } catch (e) {
-      Alert.alert('Backup Failed', 'Could not create the encrypted backup.');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleRestore() {
     const text = takePendingRestoreText();
@@ -125,7 +38,14 @@ export function BackupPasswordModal() {
     setBusy(true);
     try {
       const container = parseEncryptedBackupContainer(text);
-      const decryptedJson = await decryptBackup(container, password);
+      let decryptedJson: string;
+      try {
+        decryptedJson = await decryptBackup(container, password);
+      } catch (e) {
+        // Keyboards often add a trailing space; retry once with the trimmed password.
+        if (!(e instanceof BackupPasswordError) || password.trim() === password) throw e;
+        decryptedJson = await decryptBackup(container, password.trim());
+      }
       const backup = parseDbBackupJson(decryptedJson);
 
       Alert.alert(
@@ -161,16 +81,15 @@ export function BackupPasswordModal() {
 
   return (
     <FormScreen
-      title={mode === 'backup' ? 'Backup Password' : 'Enter Backup Password'}
+      title="Enter Backup Password"
       onCancel={() => navigation.goBack()}
-      onSave={mode === 'backup' ? handleBackup : handleRestore}
-      saveDisabled={!canSave}
-      saveLabel={mode === 'backup' ? 'Create Backup' : 'Restore'}
+      onSave={handleRestore}
+      saveDisabled={busy || password.length === 0}
+      saveLabel="Restore"
     >
       <Text style={typography.caption}>
-        {mode === 'backup'
-          ? 'Choose a password to encrypt your backup. You will need this password to restore it later. SpendHive does not store this password anywhere.'
-          : 'Enter the password used to create this backup.'}
+        This backup was made by an older version of SpendHive and is password-protected. Enter the password used to
+        create it.
       </Text>
 
       <Text style={[typography.label, { marginTop: 16 }]}>PASSWORD</Text>
@@ -178,33 +97,18 @@ export function BackupPasswordModal() {
         style={styles.input}
         value={password}
         onChangeText={setPassword}
-        placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
         placeholderTextColor={colors.textSecondary}
         secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
         autoFocus
       />
-
-      {mode === 'backup' && (
-        <>
-          <Text style={[typography.label, { marginTop: 16 }]}>CONFIRM PASSWORD</Text>
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Re-enter password"
-            placeholderTextColor={colors.textSecondary}
-            secureTextEntry
-          />
-          {confirmPassword.length > 0 && confirmPassword !== password && (
-            <Text style={[typography.caption, { color: colors.expense, marginTop: 6 }]}>Passwords don't match.</Text>
-          )}
-        </>
-      )}
 
       {busy && (
         <View style={styles.busyRow}>
           <ActivityIndicator color={colors.gold} />
-          <Text style={typography.caption}>{mode === 'backup' ? 'Encrypting...' : 'Decrypting...'}</Text>
+          <Text style={typography.caption}>Decrypting...</Text>
         </View>
       )}
     </FormScreen>
