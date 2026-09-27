@@ -151,7 +151,7 @@ export function BackupPasswordModal() {
         Alert.alert('Restore Failed', e.message);
         navigation.goBack();
       } else {
-        Alert.alert('Restore Failed', 'Could not read this backup file.');
+        Alert.alert('Restore Failed', `Could not read this backup file.\n\n${e instanceof Error ? e.message : String(e)}`);
         navigation.goBack();
       }
     } finally {

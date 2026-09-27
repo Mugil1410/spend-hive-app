@@ -111,7 +111,13 @@ android {
             reset()
             enable true
             universalApk false
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            include "arm64-v8a"
+        }
+    }
+    packagingOptions {
+        jniLibs {
+            // Store .so files compressed in the APK (smaller download; extracted on install).
+            useLegacyPackaging true
         }
     }
 }
@@ -127,4 +133,8 @@ dependencies {
     }
 }
 
+// Only bundle the icon font the app actually uses.
+project.ext.vectoricons = [
+    iconFontNames: ["MaterialCommunityIcons.ttf"]
+]
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")

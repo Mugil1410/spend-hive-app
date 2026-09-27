@@ -4,8 +4,9 @@
 // The key itself is never stored - only the salt, cipher metadata, and ciphertext are.
 import { gcm } from '@noble/ciphers/aes.js';
 import { argon2idAsync } from '@noble/hashes/argon2.js';
-import { bytesToHex, hexToBytes, utf8ToBytes, bytesToUtf8, randomBytes, concatBytes } from '@noble/ciphers/utils.js';
+import { bytesToHex, hexToBytes, randomBytes, concatBytes } from '@noble/ciphers/utils.js';
 import { bytesToBase64, base64ToBytes } from './base64';
+import { stringToUtf8Bytes, utf8BytesToString } from './utf8';
 
 export const BACKUP_FORMAT_VERSION = 1;
 
@@ -32,7 +33,7 @@ export class BackupFormatError extends Error {}
 export class BackupPasswordError extends Error {}
 
 async function deriveKey(password: string, salt: Uint8Array, t: number, m: number, p: number): Promise<Uint8Array> {
-  return argon2idAsync(password, salt, { t, m, p, dkLen: KEY_LENGTH });
+  return argon2idAsync(stringToUtf8Bytes(password), salt, { t, m, p, dkLen: KEY_LENGTH });
 }
 
 export async function encryptBackup(
@@ -43,7 +44,7 @@ export async function encryptBackup(
   const salt = randomBytes(SALT_LENGTH);
   const iv = randomBytes(IV_LENGTH);
   const keyBytes = await deriveKey(password, salt, DEFAULT_ARGON2_T, DEFAULT_ARGON2_M_KIB, DEFAULT_ARGON2_P);
-  const ciphertextWithTag = gcm(keyBytes, iv).encrypt(utf8ToBytes(plaintextJson));
+  const ciphertextWithTag = gcm(keyBytes, iv).encrypt(stringToUtf8Bytes(plaintextJson));
   const payloadB64 = bytesToBase64(concatBytes(iv, ciphertextWithTag));
 
   return {
@@ -86,16 +87,18 @@ export async function decryptBackup(container: EncryptedBackupContainer, passwor
   if (container.kdf.type !== 'argon2id' || container.cipher.type !== 'aes-256-gcm') {
     throw new BackupFormatError('This backup uses an encryption scheme this app version does not support.');
   }
+  const salt = hexToBytes(container.kdf.saltHex);
+  const keyBytes = await deriveKey(password, salt, container.kdf.t, container.kdf.m, container.kdf.p);
+  const combined = base64ToBytes(container.payloadB64);
+  const iv = combined.slice(0, container.cipher.ivLength);
+  const ciphertextWithTag = combined.slice(container.cipher.ivLength);
+
+  let plaintextBytes: Uint8Array;
   try {
-    const salt = hexToBytes(container.kdf.saltHex);
-    const keyBytes = await deriveKey(password, salt, container.kdf.t, container.kdf.m, container.kdf.p);
-    const combined = base64ToBytes(container.payloadB64);
-    const iv = combined.slice(0, container.cipher.ivLength);
-    const ciphertextWithTag = combined.slice(container.cipher.ivLength);
-    const plaintextBytes = gcm(keyBytes, iv).decrypt(ciphertextWithTag);
-    return bytesToUtf8(plaintextBytes);
-  } catch (e) {
-    if (e instanceof BackupFormatError) throw e;
+    // GCM's auth-tag check is the only failure that genuinely means "wrong password".
+    plaintextBytes = gcm(keyBytes, iv).decrypt(ciphertextWithTag);
+  } catch {
     throw new BackupPasswordError('Incorrect password, or this backup file is corrupted.');
   }
+  return utf8BytesToString(plaintextBytes);
 }

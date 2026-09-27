@@ -11,9 +11,8 @@ import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
-import { buildTransactionsWorkbookBytes } from '@/utils/exportExcel';
+import { buildTransactionsCsv } from '@/utils/exportCsv';
 import { setPendingRestoreText } from '@/utils/pendingRestore';
-import { bytesToBase64 } from '@/utils/base64';
 import { format } from 'date-fns';
 
 export function SettingsScreen() {
@@ -33,15 +32,15 @@ export function SettingsScreen() {
 
   async function handleExportTransactions() {
     try {
-      const bytes = buildTransactionsWorkbookBytes({ transactions, accounts, categories, events, cashbookEntries, debtors });
-      const fileName = `spendhive-transactions-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`;
+      const csv = buildTransactionsCsv({ transactions, accounts, categories, events, cashbookEntries, debtors });
+      const fileName = `spendhive-transactions-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
       const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      await RNFS.writeFile(filePath, bytesToBase64(bytes), 'base64');
+      await RNFS.writeFile(filePath, csv, 'utf8');
 
       try {
         await Share.open({
           url: `file://${filePath}`,
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          type: 'text/csv',
           title: 'Export Transactions',
           failOnCancel: false,
         });
@@ -124,7 +123,7 @@ export function SettingsScreen() {
           <SettingsRow
             icon="microsoft-excel"
             label="Export Transactions to Excel"
-            description="Save your transactions as a .xlsx file"
+            description="Save your transactions as a .csv file (opens in Excel)"
             onPress={handleExportTransactions}
           />
         </Card>

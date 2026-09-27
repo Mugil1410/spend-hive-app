@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { Account, Category, Transaction, CashbookEntry, Debtor, Event } from '@/types';
 
 interface TransactionsExportData {
@@ -10,10 +9,18 @@ interface TransactionsExportData {
   debtors: Debtor[];
 }
 
+const HEADERS = ['Date', 'Transaction Type', 'Amount', 'Account', 'To Account', 'Category', 'Event', 'Person', 'Note'];
+
+// RFC 4180 quoting: wrap in quotes when the value has a comma, quote or line break.
+function csvCell(value: string | number): string {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 // Exports only transaction-level data - no raw database tables, internal config, or
 // auth/migration internals. Notes are included here (labeled) even though they're
 // hidden from the in-app transaction list, since they're still meaningful export data.
-export function buildTransactionsWorkbookBytes(data: TransactionsExportData): Uint8Array {
+export function buildTransactionsCsv(data: TransactionsExportData): string {
   const { transactions, accounts, categories, events, cashbookEntries, debtors } = data;
 
   const accountById = new Map(accounts.map((a) => [a.id, a.name]));
@@ -31,20 +38,18 @@ export function buildTransactionsWorkbookBytes(data: TransactionsExportData): Ui
 
   const rows = [...transactions]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .map((t) => ({
-      Date: t.date,
-      'Transaction Type': t.type,
-      Amount: t.amount,
-      Account: accountById.get(t.accountId) ?? '',
-      'To Account': t.toAccountId ? accountById.get(t.toAccountId) ?? '' : '',
-      Category: t.type === 'TRANSFER' ? '' : categoryById.get(t.categoryId) ?? '',
-      Event: t.eventId ? eventById.get(t.eventId) ?? '' : '',
-      Person: personFor(t),
-      Note: t.note ?? '',
-    }));
+    .map((t) => [
+      t.date,
+      t.type,
+      t.amount,
+      accountById.get(t.accountId) ?? '',
+      t.toAccountId ? accountById.get(t.toAccountId) ?? '' : '',
+      t.type === 'TRANSFER' ? '' : categoryById.get(t.categoryId) ?? '',
+      t.eventId ? eventById.get(t.eventId) ?? '' : '',
+      personFor(t),
+      t.note ?? '',
+    ]);
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Transactions');
-  const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array;
-  return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  // Leading BOM so Excel opens the file as UTF-8 (non-ASCII names, ₹, etc.).
+  return '﻿' + [HEADERS, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
