@@ -2,13 +2,26 @@ node_modules/
 dist/
 *.log
 .DS_Store
+Thumbs.db
+.idea/
+*.iml
+*.hprof
 
 # Xcode / CocoaPods / Gradle build output (android/ and ios/ project files themselves are committed)
 ios/Pods/
 ios/build/
+ios/DerivedData/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+android/local.properties
 android/app/build/
 android/build/
+android/buildSrc/build/
 android/.gradle/
+android/.kotlin/
+android/**/.cxx/
+android/captures/
 *.jks
 *.p8
 *.p12
