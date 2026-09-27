@@ -1,11 +1,19 @@
 node_modules/
-.expo/
 dist/
-web-build/
 *.log
 .DS_Store
-android/
-ios/
+
+# Xcode / CocoaPods / Gradle build output (android/ and ios/ project files themselves are committed)
+ios/Pods/
+ios/build/
+android/app/build/
+android/build/
+android/.gradle/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 
 # Personal financial data / DB dumps — never commit real user data
 *.db

@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { File, Paths } from 'expo-file-system';
-import { readAsStringAsync } from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
+import { pick, keepLocalCopy, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -14,6 +13,7 @@ import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { buildTransactionsWorkbookBytes } from '@/utils/exportExcel';
 import { setPendingRestoreText } from '@/utils/pendingRestore';
+import { bytesToBase64 } from '@/utils/base64';
 import { format } from 'date-fns';
 
 export function SettingsScreen() {
@@ -35,18 +35,18 @@ export function SettingsScreen() {
     try {
       const bytes = buildTransactionsWorkbookBytes({ transactions, accounts, categories, events, cashbookEntries, debtors });
       const fileName = `spendhive-transactions-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`;
-      const file = new File(Paths.document, fileName);
-      file.create({ overwrite: true });
-      file.write(bytes);
+      const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+      await RNFS.writeFile(filePath, bytesToBase64(bytes), 'base64');
 
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Export Transactions',
+      try {
+        await Share.open({
+          url: `file://${filePath}`,
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          title: 'Export Transactions',
+          failOnCancel: false,
         });
-      } else {
-        Alert.alert('Export Saved', `Saved to ${file.uri}`);
+      } catch {
+        Alert.alert('Export Saved', `Saved to ${filePath}`);
       }
     } catch (e) {
       Alert.alert('Export Failed', 'Could not export transactions.');
@@ -59,16 +59,23 @@ export function SettingsScreen() {
 
   async function handleRestore() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/plain', '*/*'],
-        copyToCacheDirectory: true,
+      const [pickedFile] = await pick({
+        type: [types.json, types.plainText, types.allFiles],
       });
-      if (result.canceled || !result.assets?.[0]) return;
+      const [copy] = await keepLocalCopy({
+        files: [{ uri: pickedFile.uri, fileName: pickedFile.name ?? 'backup' }],
+        destination: 'cachesDirectory',
+      });
+      if (copy.status !== 'success') {
+        Alert.alert('Restore Failed', 'Could not read the selected file.');
+        return;
+      }
 
-      const text = await readAsStringAsync(result.assets[0].uri);
+      const text = await RNFS.readFile(copy.localUri, 'utf8');
       setPendingRestoreText(text);
       navigation.navigate('BackupPassword', { mode: 'restore' });
     } catch (e) {
+      if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) return;
       Alert.alert('Restore Failed', 'Could not read the selected file.');
     }
   }

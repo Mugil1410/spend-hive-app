@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Platform, Alert } from 'react-native';
 import { createDrawerNavigator, DrawerContentComponentProps } from '@react-navigation/drawer';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Constants from 'expo-constants';
 import { useTheme } from '@/theme/ThemeContext';
 import { DrawerParamList, BottomTabParamList } from './types';
 import { BottomTabNavigator } from './BottomTabNavigator';
+import pkg from '../../package.json';
 
-const APP_VERSION = Constants.expoConfig?.version ?? '0.1.0';
+const APP_VERSION = pkg.version ?? '0.1.0';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 

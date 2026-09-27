@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View, Platform } from 'react-native';
-import { File, Paths } from 'expo-file-system';
-import { StorageAccessFramework } from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import RNFS from 'react-native-fs';
+import { openDocumentTree, writeFile as safWriteFile } from 'react-native-saf-x';
+import Share from 'react-native-share';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
@@ -29,11 +29,10 @@ const MIN_PASSWORD_LENGTH = 6;
  */
 async function saveToChosenFolder(baseName: string, contents: string): Promise<boolean> {
   try {
-    const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-    if (!permission.granted) return false;
+    const dir = await openDocumentTree(true);
+    if (!dir) return false;
 
-    const fileUri = await StorageAccessFramework.createFileAsync(permission.directoryUri, baseName, 'application/json');
-    await StorageAccessFramework.writeAsStringAsync(fileUri, contents);
+    await safWriteFile(`${dir.uri}/${baseName}`, contents, { mimeType: 'application/json' });
     Alert.alert('Backup Saved', 'Your encrypted backup was saved to the selected folder.');
     return true;
   } catch {
@@ -94,18 +93,18 @@ export function BackupPasswordModal() {
       const savedToFolder = Platform.OS === 'android' && (await saveToChosenFolder(baseName, contents));
 
       if (!savedToFolder) {
-        const file = new File(Paths.document, fileName);
-        file.create({ overwrite: true });
-        file.write(contents);
+        const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        await RNFS.writeFile(filePath, contents, 'utf8');
 
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(file.uri, {
-            mimeType: 'application/json',
-            dialogTitle: 'Save SpendHive Backup',
+        try {
+          await Share.open({
+            url: `file://${filePath}`,
+            type: 'application/json',
+            title: 'Save SpendHive Backup',
+            failOnCancel: false,
           });
-        } else {
-          Alert.alert('Backup Saved', `Saved to ${file.uri}`);
+        } catch {
+          Alert.alert('Backup Saved', `Saved to ${filePath}`);
         }
       }
       navigation.goBack();

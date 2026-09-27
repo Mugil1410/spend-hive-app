@@ -1,10 +1,11 @@
-// Encrypted backup container: AES-256-GCM (authenticated encryption, via the platform's
-// native crypto through expo-crypto) with a key derived from the user's password using
-// Argon2id (pure-JS, tuned down from its 1 GiB default to a mobile-appropriate memory cost).
+// Encrypted backup container: AES-256-GCM (authenticated encryption, pure-JS via @noble/ciphers)
+// with a key derived from the user's password using Argon2id (pure-JS, tuned down from its
+// 1 GiB default to a mobile-appropriate memory cost).
 // The key itself is never stored - only the salt, cipher metadata, and ciphertext are.
-import { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync, getRandomBytesAsync } from 'expo-crypto';
+import { gcm } from '@noble/ciphers/aes.js';
 import { argon2idAsync } from '@noble/hashes/argon2.js';
-import { bytesToHex, hexToBytes, utf8ToBytes, bytesToUtf8 } from '@noble/ciphers/utils.js';
+import { bytesToHex, hexToBytes, utf8ToBytes, bytesToUtf8, randomBytes, concatBytes } from '@noble/ciphers/utils.js';
+import { bytesToBase64, base64ToBytes } from './base64';
 
 export const BACKUP_FORMAT_VERSION = 1;
 
@@ -14,6 +15,8 @@ const DEFAULT_ARGON2_T = 3;
 const DEFAULT_ARGON2_M_KIB = 19456; // ~19 MiB
 const DEFAULT_ARGON2_P = 1;
 const KEY_LENGTH = 32; // AES-256
+const IV_LENGTH = gcm.nonceLength; // 12 bytes
+const TAG_LENGTH = gcm.tagLength; // 16 bytes
 
 export interface EncryptedBackupContainer {
   container: 'spendhive-encrypted-backup';
@@ -37,11 +40,11 @@ export async function encryptBackup(
   password: string,
   dbBackupVersion: number
 ): Promise<EncryptedBackupContainer> {
-  const salt = await getRandomBytesAsync(SALT_LENGTH);
+  const salt = randomBytes(SALT_LENGTH);
+  const iv = randomBytes(IV_LENGTH);
   const keyBytes = await deriveKey(password, salt, DEFAULT_ARGON2_T, DEFAULT_ARGON2_M_KIB, DEFAULT_ARGON2_P);
-  const key = await AESEncryptionKey.import(keyBytes);
-  const sealed = await aesEncryptAsync(utf8ToBytes(plaintextJson), key);
-  const payloadB64 = await sealed.combined('base64');
+  const ciphertextWithTag = gcm(keyBytes, iv).encrypt(utf8ToBytes(plaintextJson));
+  const payloadB64 = bytesToBase64(concatBytes(iv, ciphertextWithTag));
 
   return {
     container: 'spendhive-encrypted-backup',
@@ -53,7 +56,7 @@ export async function encryptBackup(
       p: DEFAULT_ARGON2_P,
       saltHex: bytesToHex(salt),
     },
-    cipher: { type: 'aes-256-gcm', ivLength: sealed.ivSize, tagLength: sealed.tagSize },
+    cipher: { type: 'aes-256-gcm', ivLength: IV_LENGTH, tagLength: TAG_LENGTH },
     createdAt: new Date().toISOString(),
     dbBackupVersion,
     payloadB64,
@@ -86,13 +89,11 @@ export async function decryptBackup(container: EncryptedBackupContainer, passwor
   try {
     const salt = hexToBytes(container.kdf.saltHex);
     const keyBytes = await deriveKey(password, salt, container.kdf.t, container.kdf.m, container.kdf.p);
-    const key = await AESEncryptionKey.import(keyBytes);
-    const sealed = AESSealedData.fromCombined(container.payloadB64, {
-      ivLength: container.cipher.ivLength,
-      tagLength: container.cipher.tagLength as 16 | 15 | 14 | 13 | 12 | 8 | 4,
-    });
-    const plaintextBytes = await aesDecryptAsync(sealed, key, { output: 'bytes' });
-    return bytesToUtf8(plaintextBytes as Uint8Array);
+    const combined = base64ToBytes(container.payloadB64);
+    const iv = combined.slice(0, container.cipher.ivLength);
+    const ciphertextWithTag = combined.slice(container.cipher.ivLength);
+    const plaintextBytes = gcm(keyBytes, iv).decrypt(ciphertextWithTag);
+    return bytesToUtf8(plaintextBytes);
   } catch (e) {
     if (e instanceof BackupFormatError) throw e;
     throw new BackupPasswordError('Incorrect password, or this backup file is corrupted.');

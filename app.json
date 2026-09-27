@@ -1,45 +1,4 @@
 {
-  "expo": {
-    "name": "SpendHive",
-    "slug": "mymoney-pro-clone",
-    "version": "1.0.1",
-    "scheme": "spendhive",
-    "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "icon": "./assets/app-icon.png",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.spendhive"
-    },
-    "android": {
-      "package": "com.spendhive",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/app-icon-adaptive.png",
-        "backgroundColor": "#262523"
-      }
-    },
-    "plugins": [
-      "expo-font",
-      "expo-asset",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/app-icon.png",
-          "imageWidth": 96,
-          "resizeMode": "contain",
-          "backgroundColor": "#262523"
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "ca84777f-c603-4200-a262-b0fb467ddb54"
-      }
-    },
-    "owner": "mugil1410"
-  }
+  "name": "SpendHive",
+  "displayName": "SpendHive"
 }

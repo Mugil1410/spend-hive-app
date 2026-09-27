@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollView } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
@@ -162,7 +162,7 @@ export function CashbookFormModal() {
             <Text style={[typography.label, { marginTop: 16 }]}>
               {type === 'LOAN' ? 'RECEIVE INTO ACCOUNT' : 'GIVE FROM ACCOUNT'}
             </Text>
-            <View style={styles.pillsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
               {sortedAccounts.map((a) => (
                 <TouchableOpacity
                   key={a.id}
@@ -172,7 +172,7 @@ export function CashbookFormModal() {
                   <Text style={[typography.body, accountId === a.id && { color: colors.background }]}>{a.name}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
 
