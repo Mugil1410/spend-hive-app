@@ -64,7 +64,7 @@ module.exports = {
     ],
     extra: {
       eas: {
-        projectId: 'ca84777f-c603-4200-a262-b0fb467ddb54',
+        projectId: '020097c7-f3a4-483d-86d5-23f8fb9647af',
       },
     },
     owner: 'mugil1410',
