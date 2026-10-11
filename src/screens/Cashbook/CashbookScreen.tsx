@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -13,7 +13,8 @@ import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { CashbookEntry, CashbookType } from '@/types';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '@/utils/dateUtils';
+import { entryOutstanding, entryPaid, entryRemaining } from '@/store/cashbookSync';
 
 type StatusFilter = 'PENDING' | 'COMPLETED' | 'ALL';
 
@@ -22,11 +23,6 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'COMPLETED', label: 'Completed' },
   { key: 'ALL', label: 'All' },
 ];
-
-function entryRemaining(entry: CashbookEntry): number {
-  const paid = entry.installments.reduce((s, i) => s + i.paidAmount, 0);
-  return entry.totalAmount - paid;
-}
 
 export function CashbookScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -43,16 +39,17 @@ export function CashbookScreen() {
 
   const typeEntries = useMemo(() => cashbookEntries.filter((e) => e.type === tab), [cashbookEntries, tab]);
 
+  // Closed entries owe nothing, so they drop out of pending totals but stay under Completed/All.
   const totalPending = useMemo(
-    () => typeEntries.reduce((s, e) => s + Math.max(0, entryRemaining(e)), 0),
+    () => typeEntries.reduce((s, e) => s + entryOutstanding(e), 0),
     [typeEntries]
   );
 
   const filteredEntries = useMemo(() => {
     return typeEntries.filter((e) => {
-      const remaining = entryRemaining(e);
-      if (statusFilter === 'PENDING') return remaining > 0;
-      if (statusFilter === 'COMPLETED') return remaining <= 0;
+      const outstanding = entryOutstanding(e);
+      if (statusFilter === 'PENDING') return outstanding > 0;
+      if (statusFilter === 'COMPLETED') return outstanding <= 0;
       return true;
     });
   }, [typeEntries, statusFilter]);
@@ -67,7 +64,7 @@ export function CashbookScreen() {
     return Array.from(byGroup.values())
       .map((group) => ({
         title: group.title,
-        pending: group.entries.reduce((s, e) => s + Math.max(0, entryRemaining(e)), 0),
+        pending: group.entries.reduce((s, e) => s + entryOutstanding(e), 0),
         data: group.entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
@@ -133,10 +130,11 @@ export function CashbookScreen() {
           </View>
         )}
         renderItem={({ item }) => {
-          const paid = item.installments.reduce((s, i) => s + i.paidAmount, 0);
+          const paid = entryPaid(item);
           const percent = item.totalAmount > 0 ? (paid / item.totalAmount) * 100 : 0;
-          const remaining = item.totalAmount - paid;
+          const remaining = entryRemaining(item);
           const allPaid = remaining <= 0;
+          const closed = !!item.closedAt;
           return (
             <TouchableOpacity onPress={() => navigation.navigate('CashbookEntryDetail', { entryId: item.id })}>
               <Card style={{ marginBottom: 12 }}>
@@ -146,13 +144,20 @@ export function CashbookScreen() {
                   </Text>
                   <Text style={[typography.amount, { color: accentColor }]}>{formatCurrency(item.totalAmount)}</Text>
                 </View>
-                <Text style={typography.caption}>Created {format(new Date(item.createdAt), 'MMM d, yyyy')}</Text>
+                <Text style={typography.caption}>Created {formatDisplayDate(item.createdAt)}</Text>
                 <View style={{ marginTop: 10 }}>
-                  <ProgressBar percent={percent} color={allPaid ? colors.income : accentColor} />
+                  <ProgressBar percent={percent} color={allPaid || closed ? colors.income : accentColor} />
                 </View>
                 <View style={styles.entryFooter}>
-                  <Text style={typography.caption}>{allPaid ? 'Fully settled' : `Remaining ${formatCurrency(remaining)}`}</Text>
+                  <Text style={typography.caption}>
+                    {allPaid
+                      ? 'Fully settled'
+                      : closed
+                        ? `Closed · ${formatCurrency(item.closedOutstanding ?? remaining)} written off`
+                        : `Remaining ${formatCurrency(remaining)}`}
+                  </Text>
                   {allPaid && <MaterialCommunityIcons name="check-circle" size={16} color={colors.income} />}
+                  {closed && !allPaid && <MaterialCommunityIcons name="lock-check-outline" size={16} color={colors.textSecondary} />}
                 </View>
               </Card>
             </TouchableOpacity>

@@ -10,7 +10,9 @@ export interface Transaction {
   date: string; // ISO string
   note?: string;
   eventId?: string;
-  cashbookRef?: { entryId: string; installmentId?: string }; // set when auto-created from Cashbook
+  // Set when auto-created from Cashbook. No installmentId = the entry's creation transaction;
+  // installmentId + paymentId = one repayment, mirrored 1:1 by CashbookPayment.transactionId.
+  cashbookRef?: { entryId: string; installmentId?: string; paymentId?: string };
 }
 
 export type AccountType = 'CASH' | 'CARD' | 'SAVINGS' | 'CUSTOM';
@@ -23,6 +25,9 @@ export interface Account {
   icon: string;
   color: string;
   archived?: boolean;
+  // Spending-limit accounts (e.g. UPI Circle): the limit is not money held. Available amount =
+  // monthlyLimit - this calendar month's spending; it resets on the 1st with no transaction.
+  monthlyLimit?: number;
 }
 
 export type CategoryType = 'EXPENSE' | 'INCOME';
@@ -44,12 +49,24 @@ export interface Budget {
 
 export type InstallmentStatus = 'PENDING' | 'PARTIAL' | 'PAID';
 
+// One repayment against an installment; always has exactly one linked Transaction.
+export interface CashbookPayment {
+  id: string;
+  amount: number;
+  date: string; // ISO string
+  accountId: string;
+  transactionId: string;
+}
+
 export interface CashbookInstallment {
   id: string;
   expectedAmount: number;
-  paidAmount: number;
+  paidAmount: number; // always untrackedPaidAmount + sum(payments) - see recalcInstallment
   dueDate: string; // ISO string
   status: InstallmentStatus;
+  payments?: CashbookPayment[];
+  // Paid amount from before payments were tracked that has no surviving linked transaction.
+  untrackedPaidAmount?: number;
 }
 
 export type CashbookType = 'LOAN' | 'LENT';
@@ -64,6 +81,9 @@ export interface CashbookEntry {
   installments: CashbookInstallment[];
   createdAt: string;
   note?: string;
+  // Administrative close (e.g. waiving a small remainder). Creates no transaction.
+  closedAt?: string;
+  closedOutstanding?: number; // remaining amount at the moment of closing
 }
 
 export interface Debtor {

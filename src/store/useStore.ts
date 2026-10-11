@@ -10,11 +10,26 @@ import {
   Budget,
   CashbookEntry,
   CashbookInstallment,
+  CashbookPayment,
   CashbookType,
-  TransactionType,
   Debtor,
   Event,
 } from '@/types';
+import {
+  Ledger,
+  applyCloseEntry,
+  applyDeleteEntry,
+  applyDeletePayment,
+  applyDeleteTransaction,
+  applyRecordPayment,
+  applyReopenEntry,
+  applyUpdateEntry,
+  applyUpdatePayment,
+  applyUpdateTransaction,
+  cashbookAutoNote,
+  computeInstallmentStatus,
+  linkCashbookPayments,
+} from './cashbookSync';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -50,8 +65,10 @@ interface AppState {
 
   // Transactions
   addTransaction: (tx: Omit<Transaction, 'id'>) => string;
+  // Cashbook-linked transactions sync back into their entry. Returns false when refused
+  // (an entry's creation transaction can only be removed by deleting the entry).
   updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void;
-  deleteTransaction: (id: string) => void;
+  deleteTransaction: (id: string) => boolean;
 
   // Budgets
   setBudget: (categoryId: string, period: string, limit: number) => void;
@@ -73,15 +90,26 @@ interface AppState {
     id: string,
     patch: Partial<Pick<CashbookEntry, 'contactName' | 'debtorId' | 'note' | 'createdAt'>>
   ) => void;
-  deleteCashbookEntry: (id: string) => void;
+  deleteCashbookEntry: (id: string, options?: { deleteTransactions?: boolean }) => void;
   updateInstallmentDueDate: (entryId: string, installmentId: string, dueDate: string) => void;
   updateInstallmentAmount: (entryId: string, installmentId: string, expectedAmount: number) => void;
   recordInstallmentPayment: (
     entryId: string,
     installmentId: string,
     paymentAmount: number,
-    accountId: string
-  ) => void;
+    accountId: string,
+    date?: string
+  ) => boolean;
+  updateCashbookPayment: (
+    entryId: string,
+    installmentId: string,
+    paymentId: string,
+    patch: Partial<Pick<CashbookPayment, 'amount' | 'date' | 'accountId'>>
+  ) => boolean;
+  deleteCashbookPayment: (entryId: string, installmentId: string, paymentId: string) => boolean;
+  // Administrative close/reopen of an outstanding balance - never touches transactions.
+  closeCashbookEntry: (id: string) => boolean;
+  reopenCashbookEntry: (id: string) => boolean;
 
   // Debtors
   findOrCreateDebtor: (name: string) => string;
@@ -117,10 +145,8 @@ interface AppState {
   updateNotificationSettings: (patch: Partial<NotificationSettings>) => void;
 }
 
-function computeInstallmentStatus(expected: number, paid: number): CashbookInstallment['status'] {
-  if (paid <= 0) return 'PENDING';
-  if (paid >= expected) return 'PAID';
-  return 'PARTIAL';
+function ledgerOf(state: Pick<AppState, 'transactions' | 'cashbookEntries'>): Ledger {
+  return { transactions: state.transactions, cashbookEntries: state.cashbookEntries };
 }
 
 export const useStore = create<AppState>()(
@@ -179,12 +205,16 @@ export const useStore = create<AppState>()(
         return id;
       },
       updateTransaction: (id, patch) => {
-        set((state) => ({
-          transactions: state.transactions.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        }));
+        set((state) => applyUpdateTransaction(ledgerOf(state), id, patch));
       },
       deleteTransaction: (id) => {
-        set((state) => ({ transactions: state.transactions.filter((t) => t.id !== id) }));
+        let deleted = false;
+        set((state) => {
+          const result = applyDeleteTransaction(ledgerOf(state), id);
+          deleted = result.deleted;
+          return result.deleted ? result.ledger : state;
+        });
+        return deleted;
       },
 
       setBudget: (categoryId, period, limit) => {
@@ -256,7 +286,7 @@ export const useStore = create<AppState>()(
           categoryId: creationCategoryId,
           accountId,
           date: resolvedCreatedAt,
-          note: `${type === 'LOAN' ? 'Loan from' : 'Lent to'} ${contactName}`,
+          note: cashbookAutoNote(type, 'creation', contactName),
           cashbookRef: { entryId: id },
         };
 
@@ -267,12 +297,10 @@ export const useStore = create<AppState>()(
         return id;
       },
       updateCashbookEntry: (id, patch) => {
-        set((state) => ({
-          cashbookEntries: state.cashbookEntries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        }));
+        set((state) => applyUpdateEntry(ledgerOf(state), id, patch));
       },
-      deleteCashbookEntry: (id) => {
-        set((state) => ({ cashbookEntries: state.cashbookEntries.filter((e) => e.id !== id) }));
+      deleteCashbookEntry: (id, options) => {
+        set((state) => applyDeleteEntry(ledgerOf(state), id, options?.deleteTransactions ?? false));
       },
       updateInstallmentDueDate: (entryId, installmentId, dueDate) => {
         set((state) => ({
@@ -300,16 +328,10 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      recordInstallmentPayment: (entryId, installmentId, paymentAmount, accountId) => {
+      recordInstallmentPayment: (entryId, installmentId, paymentAmount, accountId, date) => {
         const state = get();
         const entry = state.cashbookEntries.find((e) => e.id === entryId);
-        if (!entry) return;
-        const installment = entry.installments.find((i) => i.id === installmentId);
-        if (!installment) return;
-
-        const remaining = installment.expectedAmount - installment.paidAmount;
-        const applied = Math.min(paymentAmount, remaining > 0 ? paymentAmount : paymentAmount);
-        const newPaidAmount = installment.paidAmount + applied;
+        if (!entry || entry.closedAt) return false;
 
         // Category used for auto-generated cashbook repayment transactions.
         const categoryId =
@@ -317,38 +339,54 @@ export const useStore = create<AppState>()(
             ? ensureCategory(state, 'EXPENSE', 'Loan Payment', 'hand-coin', '#E86759')
             : ensureCategory(state, 'INCOME', 'Debt Collection', 'cash-refund', '#50B98A');
 
-        const txType: TransactionType = entry.type === 'LOAN' ? 'EXPENSE' : 'INCOME';
-        const txId = generateId();
-        const transaction: Transaction = {
-          id: txId,
-          amount: applied,
-          type: txType,
-          categoryId,
-          accountId,
-          date: new Date().toISOString(),
-          note: `${entry.type === 'LOAN' ? 'Loan payment to' : 'Payment received from'} ${entry.contactName}`,
-          cashbookRef: { entryId, installmentId },
-        };
-
-        set((s) => ({
-          transactions: [...s.transactions, transaction],
-          cashbookEntries: s.cashbookEntries.map((e) =>
-            e.id !== entryId
-              ? e
-              : {
-                  ...e,
-                  installments: e.installments.map((i) =>
-                    i.id !== installmentId
-                      ? i
-                      : {
-                          ...i,
-                          paidAmount: newPaidAmount,
-                          status: computeInstallmentStatus(i.expectedAmount, newPaidAmount),
-                        }
-                  ),
-                }
-          ),
-        }));
+        // Payment record + its transaction land in one update, built from the latest state.
+        let recorded = false;
+        set((s) => {
+          const next = applyRecordPayment(
+            ledgerOf(s),
+            { entryId, installmentId, amount: paymentAmount, accountId, date: date ?? new Date().toISOString(), categoryId },
+            generateId
+          );
+          recorded = !!next;
+          return next ?? s;
+        });
+        return recorded;
+      },
+      updateCashbookPayment: (entryId, installmentId, paymentId, patch) => {
+        let updated = false;
+        set((s) => {
+          const next = applyUpdatePayment(ledgerOf(s), entryId, installmentId, paymentId, patch);
+          updated = !!next;
+          return next ?? s;
+        });
+        return updated;
+      },
+      deleteCashbookPayment: (entryId, installmentId, paymentId) => {
+        let deleted = false;
+        set((s) => {
+          const next = applyDeletePayment(ledgerOf(s), entryId, installmentId, paymentId);
+          deleted = !!next;
+          return next ?? s;
+        });
+        return deleted;
+      },
+      closeCashbookEntry: (id) => {
+        let closed = false;
+        set((s) => {
+          const next = applyCloseEntry(ledgerOf(s), id, new Date().toISOString());
+          closed = !!next;
+          return next ?? s;
+        });
+        return closed;
+      },
+      reopenCashbookEntry: (id) => {
+        let reopened = false;
+        set((s) => {
+          const next = applyReopenEntry(ledgerOf(s), id);
+          reopened = !!next;
+          return next ?? s;
+        });
+        return reopened;
       },
 
       findOrCreateDebtor: (name) => {
@@ -417,12 +455,14 @@ export const useStore = create<AppState>()(
         currency,
         notificationSettings,
       }) => {
+        // Backups from before payment tracking get the same backfill as the v4 migration.
+        const linked = linkCashbookPayments({ transactions, cashbookEntries }, generateId);
         set((state) => ({
           accounts,
           categories,
-          transactions,
+          transactions: linked.transactions,
           budgets,
-          cashbookEntries,
+          cashbookEntries: linked.cashbookEntries,
           debtors: debtors ?? state.debtors,
           events: events ?? state.events,
           themeMode: themeMode ?? state.themeMode,

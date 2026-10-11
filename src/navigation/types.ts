@@ -24,7 +24,8 @@ export type RootStackParamList = {
   CategoryForm: { categoryId?: string; type?: 'EXPENSE' | 'INCOME' } | undefined;
   CashbookForm: { type: CashbookType; entryId?: string };
   CashbookEntryDetail: { entryId: string };
-  RecordPayment: { entryId: string; installmentId: string };
+  // With paymentId: edit that existing payment (and its linked transaction) instead of adding one.
+  RecordPayment: { entryId: string; installmentId: string; paymentId?: string };
   FilteredTransactions: { accountId?: string; categoryId?: string; title: string };
   Debtors: undefined;
   DebtorForm: { debtorId?: string } | undefined;

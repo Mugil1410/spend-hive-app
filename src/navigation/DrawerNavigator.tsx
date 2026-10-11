@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, BackHandler, Platform, Alert } from 'react-native';
 import { createDrawerNavigator, DrawerContentComponentProps } from '@react-navigation/drawer';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeContext';
 import { DrawerParamList, BottomTabParamList } from './types';
@@ -13,7 +13,7 @@ const APP_VERSION = pkg.version ?? '0.1.0';
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
 const MENU_ITEMS: { route: keyof BottomTabParamList; label: string; icon: string }[] = [
-  { route: 'Cashbook', label: 'Cashbook', icon: 'handshake-outline' },
+  { route: 'Categories', label: 'Categories', icon: 'shape-outline' },
   { route: 'Events', label: 'Events', icon: 'party-popper' },
   { route: 'Preferences', label: 'Preference', icon: 'tune-variant' },
   { route: 'Settings', label: 'Settings', icon: 'cog-outline' },

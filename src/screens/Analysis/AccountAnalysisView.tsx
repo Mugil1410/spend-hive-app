@@ -66,8 +66,11 @@ export function AccountAnalysisView({ flows }: { flows: AccountFlow[] }) {
           <Card key={f.account.id}>
             <View style={styles.rowHeader}>
               <Text style={typography.body}>{f.account.name}</Text>
-              <Text style={typography.amount}>{formatCurrency(f.balance)}</Text>
+              <Text style={typography.amount}>{formatCurrency(f.limitUsage ? f.limitUsage.available : f.balance)}</Text>
             </View>
+            {f.limitUsage && (
+              <Text style={typography.caption}>Left this month of {formatCurrency(f.limitUsage.limit)} limit</Text>
+            )}
             <View style={styles.tagsRow}>
               <Text style={[typography.caption, { color: colors.expense }]}>Expense {formatCurrency(f.expense)}</Text>
               <Text style={[typography.caption, { color: colors.income }]}>Income {formatCurrency(f.income)}</Text>

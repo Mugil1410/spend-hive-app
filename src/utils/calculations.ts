@@ -1,5 +1,41 @@
+import { addMonths, startOfMonth } from 'date-fns';
 import { Account, Transaction, Category } from '@/types';
 import { DateRange, isDateInRange, periodKeyForMonth } from './dateUtils';
+
+export function hasMonthlyLimit(account: Account): boolean {
+  return typeof account.monthlyLimit === 'number' && account.monthlyLimit > 0;
+}
+
+export interface MonthlyLimitUsage {
+  limit: number;
+  used: number;
+  available: number; // negative when overspent
+  periodStart: Date;
+  resetsOn: Date;
+}
+
+// The limit "resets" purely because the window moves: available = limit - spending dated
+// inside the calendar month containing `now`. Nothing is stored or written, so it can't
+// double-reset, needs no timer, and survives restarts and year boundaries. Spending is
+// expenses plus transfers out of the account; income never tops the limit up.
+export function computeMonthlyLimitUsage(
+  account: Account,
+  transactions: Transaction[],
+  now: Date = new Date()
+): MonthlyLimitUsage {
+  const periodStart = startOfMonth(now);
+  const resetsOn = addMonths(periodStart, 1);
+  const from = periodStart.getTime();
+  const to = resetsOn.getTime();
+  let used = 0;
+  for (const tx of transactions) {
+    if (tx.accountId !== account.id || (tx.type !== 'EXPENSE' && tx.type !== 'TRANSFER')) continue;
+    const at = new Date(tx.date).getTime();
+    if (at >= from && at < to) used += tx.amount;
+  }
+  const limit = account.monthlyLimit ?? 0;
+  return { limit, used, available: limit - used, periodStart, resetsOn };
+}
 
 export function computeAccountBalance(account: Account, transactions: Transaction[]): number {
   let balance = account.initialBalance;
@@ -102,6 +138,7 @@ export interface AccountFlow {
   expense: number;
   income: number;
   balance: number;
+  limitUsage?: MonthlyLimitUsage; // spending-limit accounts only (current month)
 }
 
 export function accountFlows(
@@ -118,6 +155,7 @@ export function accountFlows(
         expense: sumByType(accTx.filter((t) => t.accountId === account.id), 'EXPENSE'),
         income: sumByType(accTx, 'INCOME'),
         balance: computeAccountBalance(account, allTransactions),
+        limitUsage: hasMonthlyLimit(account) ? computeMonthlyLimitUsage(account, allTransactions) : undefined,
       };
     });
 }

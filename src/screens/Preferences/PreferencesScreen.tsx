@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -13,6 +13,7 @@ import {
   canScheduleExactAlarms,
   openAlarmPermissionSettings,
   openNotificationSettings,
+  sendTestNotification,
 } from '@/notifications/scheduler';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
@@ -35,6 +36,20 @@ export function PreferencesScreen() {
     label: `${c.label} (${c.symbol})`,
   }));
   const selectedCurrency = CURRENCIES.find((c) => c.code === currency);
+
+  async function handleTestNotification() {
+    const sent = await sendTestNotification().catch(() => false);
+    if (!sent) {
+      Alert.alert(
+        'Notifications Blocked',
+        'SpendHive needs permission to show notifications. Allow notifications in the app settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => openNotificationSettings() },
+        ]
+      );
+    }
+  }
 
   async function handleToggleNotifications(enabled: boolean) {
     if (!enabled) {
@@ -118,6 +133,15 @@ export function PreferencesScreen() {
             value={notificationSettings.enabled}
             onChange={handleToggleNotifications}
           />
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={handleTestNotification}>
+            <MaterialCommunityIcons name="bell-ring-outline" size={22} color={colors.gold} />
+            <View style={{ flex: 1 }}>
+              <Text style={typography.body}>Test Notification</Text>
+              <Text style={typography.caption}>Send a sample notification right now</Text>
+            </View>
+            <Text style={[typography.body, { color: colors.gold, fontWeight: '700' }]}>Test now</Text>
+          </TouchableOpacity>
         </Card>
 
         <Text style={[typography.label, { marginTop: 16 }]}>REMINDERS</Text>

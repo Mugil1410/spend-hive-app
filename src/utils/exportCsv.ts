@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { Account, Category, Transaction, CashbookEntry, Debtor, Event } from '@/types';
 
 interface TransactionsExportData {
@@ -9,7 +10,8 @@ interface TransactionsExportData {
   debtors: Debtor[];
 }
 
-const HEADERS = ['Date', 'Transaction Type', 'Amount', 'Account', 'To Account', 'Category', 'Event', 'Person', 'Note'];
+// Date and Time are the device-local values the user picked (not the stored UTC ISO string).
+const HEADERS = ['Date', 'Time', 'Transaction Type', 'Amount', 'Account', 'To Account', 'Category', 'Event', 'Person', 'Note'];
 
 // RFC 4180 quoting: wrap in quotes when the value has a comma, quote or line break.
 function csvCell(value: string | number): string {
@@ -39,7 +41,8 @@ export function buildTransactionsCsv(data: TransactionsExportData): string {
   const rows = [...transactions]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .map((t) => [
-      t.date,
+      format(new Date(t.date), 'yyyy-MM-dd'),
+      format(new Date(t.date), 'HH:mm'),
       t.type,
       t.amount,
       accountById.get(t.accountId) ?? '',

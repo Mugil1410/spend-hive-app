@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
-import RNFS from 'react-native-fs';
-import { openDocumentTree, writeFile as safWriteFile } from 'react-native-saf-x';
-import Share from 'react-native-share';
-import { pick, keepLocalCopy, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -24,14 +23,25 @@ import { format } from 'date-fns';
  */
 async function saveToChosenFolder(fileName: string, contents: string): Promise<boolean> {
   try {
-    const dir = await openDocumentTree(true);
-    if (!dir) return false;
-
-    await safWriteFile(`${dir.uri}/${fileName}`, contents, { mimeType: 'application/json' });
+    const dir = await Directory.pickDirectoryAsync();
+    dir.createFile(fileName, 'application/json').write(contents);
     Alert.alert('Backup Saved', 'Your backup was saved to the selected folder.');
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Writes to the app's sandboxed documents dir and opens the share sheet (or reports the path if sharing is unavailable). */
+async function saveAndShare(fileName: string, contents: string, mimeType: string, dialogTitle: string, savedTitle: string) {
+  const file = new File(Paths.document, fileName);
+  file.create({ overwrite: true });
+  file.write(contents);
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(file.uri, { mimeType, dialogTitle });
+  } else {
+    Alert.alert(savedTitle, `Saved to ${file.uri}`);
   }
 }
 
@@ -69,19 +79,7 @@ export function SettingsScreen() {
     try {
       const csv = buildTransactionsCsv({ transactions, accounts, categories, events, cashbookEntries, debtors });
       const fileName = `spendhive-transactions-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
-      const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      await RNFS.writeFile(filePath, csv, 'utf8');
-
-      try {
-        await Share.open({
-          url: `file://${filePath}`,
-          type: 'text/csv',
-          title: 'Export Transactions',
-          failOnCancel: false,
-        });
-      } catch {
-        Alert.alert('Export Saved', `Saved to ${filePath}`);
-      }
+      await saveAndShare(fileName, csv, 'text/csv', 'Export Transactions', 'Export Saved');
     } catch (e) {
       Alert.alert('Export Failed', 'Could not export transactions.');
     }
@@ -105,18 +103,7 @@ export function SettingsScreen() {
 
       if (Platform.OS === 'android' && (await saveToChosenFolder(`${baseName}.json`, json))) return;
 
-      const filePath = `${RNFS.DocumentDirectoryPath}/${baseName}.json`;
-      await RNFS.writeFile(filePath, json, 'utf8');
-      try {
-        await Share.open({
-          url: `file://${filePath}`,
-          type: 'application/json',
-          title: 'Save SpendHive Backup',
-          failOnCancel: false,
-        });
-      } catch {
-        Alert.alert('Backup Saved', `Saved to ${filePath}`);
-      }
+      await saveAndShare(`${baseName}.json`, json, 'application/json', 'Save SpendHive Backup', 'Backup Saved');
     } catch {
       Alert.alert('Backup Failed', 'Could not create the backup.');
     }
@@ -124,19 +111,13 @@ export function SettingsScreen() {
 
   async function handleRestore() {
     try {
-      const [pickedFile] = await pick({
-        type: [types.json, types.plainText, types.allFiles],
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
       });
-      const [copy] = await keepLocalCopy({
-        files: [{ uri: pickedFile.uri, fileName: pickedFile.name ?? 'backup' }],
-        destination: 'cachesDirectory',
-      });
-      if (copy.status !== 'success') {
-        Alert.alert('Restore Failed', 'Could not read the selected file.');
-        return;
-      }
+      if (result.canceled || !result.assets?.[0]) return;
 
-      const text = await RNFS.readFile(copy.localUri, 'utf8');
+      const text = await new File(result.assets[0].uri).text();
 
       // Plain JSON backups restore directly; only legacy encrypted backups need a password.
       const plain = tryParsePlainBackup(text);
@@ -161,8 +142,7 @@ export function SettingsScreen() {
 
       setPendingRestoreText(text);
       navigation.navigate('BackupPassword');
-    } catch (e) {
-      if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) return;
+    } catch {
       Alert.alert('Restore Failed', 'Could not read the selected file.');
     }
   }

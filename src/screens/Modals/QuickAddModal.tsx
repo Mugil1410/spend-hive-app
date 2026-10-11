@@ -1,23 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
 import { NumPad } from '@/components/NumPad';
 import { DropdownField } from '@/components/DropdownField';
+import { DateTimeFields } from '@/components/DateTimeFields';
 import { SelectSheet, SelectOption } from '@/components/SelectSheet';
 import { useAmountInput } from '@/utils/useAmountInput';
 import { useCurrencySymbol } from '@/utils/currency';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
-import { TransactionType } from '@/types';
-import { computeAccountBalance } from '@/utils/calculations';
+import { Account, Transaction, TransactionType } from '@/types';
+import { computeAccountBalance, computeMonthlyLimitUsage, hasMonthlyLimit } from '@/utils/calculations';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { format } from 'date-fns';
+import { requestDeleteTransaction } from '@/utils/transactionActions';
+
+function accountSubtitle(account: Account, transactions: Transaction[]): string {
+  if (hasMonthlyLimit(account)) {
+    return `${formatCurrency(computeMonthlyLimitUsage(account, transactions).available)} left this month`;
+  }
+  return formatCurrency(computeAccountBalance(account, transactions));
+}
 
 const TYPES: TransactionType[] = ['EXPENSE', 'INCOME', 'TRANSFER'];
 
@@ -39,19 +46,21 @@ export function QuickAddModal() {
   const route = useRoute<RouteProp<RootStackParamList, 'QuickAdd'>>();
   const editingId = route.params?.transactionId;
 
-  const { transactions, categories, accounts, events, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const { transactions, categories, accounts, events, cashbookEntries, addTransaction, updateTransaction } = useStore();
   const editingTx = editingId ? transactions.find((t) => t.id === editingId) : undefined;
+  const linkedEntry = editingTx?.cashbookRef
+    ? cashbookEntries.find((e) => e.id === editingTx.cashbookRef!.entryId)
+    : undefined;
 
   const [type, setType] = useState<TransactionType>(editingTx?.type ?? route.params?.type ?? 'EXPENSE');
   const { raw, numericValue, handleKey } = useAmountInput(editingTx ? String(editingTx.amount) : '0');
   const [categoryId, setCategoryId] = useState<string | undefined>(editingTx?.categoryId);
-  const [accountId, setAccountId] = useState<string | undefined>(editingTx?.accountId ?? accounts[0]?.id);
-  const [toAccountId, setToAccountId] = useState<string | undefined>(editingTx?.toAccountId ?? accounts[1]?.id);
+  // No default account: a new transaction starts empty and the user must pick one.
+  const [accountId, setAccountId] = useState<string | undefined>(editingTx?.accountId);
+  const [toAccountId, setToAccountId] = useState<string | undefined>(editingTx?.toAccountId);
   const [eventId, setEventId] = useState<string | undefined>(editingTx?.eventId ?? route.params?.eventId);
   const [date, setDate] = useState(editingTx ? new Date(editingTx.date) : new Date());
   const [note, setNote] = useState(editingTx?.note ?? '');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
 
   const visibleCategories = useMemo(
@@ -83,14 +92,14 @@ export function QuickAddModal() {
     label: a.name,
     icon: a.icon,
     color: a.color,
-    subtitle: formatCurrency(computeAccountBalance(a, transactions)),
+    subtitle: accountSubtitle(a, transactions),
   }));
   const toAccountSelectOptions: SelectOption[] = toAccountOptions.map((a) => ({
     id: a.id,
     label: a.name,
     icon: a.icon,
     color: a.color,
-    subtitle: formatCurrency(computeAccountBalance(a, transactions)),
+    subtitle: accountSubtitle(a, transactions),
   }));
   const eventOptions: SelectOption[] = [
     { id: '', label: 'No event' },
@@ -123,10 +132,7 @@ export function QuickAddModal() {
   }
 
   function handleDelete() {
-    if (editingId) {
-      deleteTransaction(editingId);
-      navigation.goBack();
-    }
+    if (editingId) requestDeleteTransaction(editingId, () => navigation.goBack());
   }
 
   return (
@@ -142,7 +148,9 @@ export function QuickAddModal() {
             {TYPES.map((t) => (
               <TouchableOpacity
                 key={t}
-                style={[styles.typePill, type === t && { backgroundColor: TYPE_COLORS[t] }]}
+                // A Cashbook transaction's type is fixed by its entry (e.g. a repayment stays an expense).
+                disabled={!!linkedEntry}
+                style={[styles.typePill, type === t && { backgroundColor: TYPE_COLORS[t] }, !!linkedEntry && type !== t && { opacity: 0.4 }]}
                 onPress={() => {
                   setType(t);
                   setCategoryId(undefined);
@@ -159,6 +167,17 @@ export function QuickAddModal() {
         </>
       }
     >
+        {linkedEntry && (
+          <View style={styles.linkedBanner}>
+            <MaterialCommunityIcons name="link-variant" size={16} color={colors.gold} />
+            <Text style={[typography.caption, { flex: 1 }]}>
+              {editingTx?.cashbookRef?.installmentId
+                ? `Cashbook repayment ${linkedEntry.type === 'LOAN' ? 'to' : 'from'} ${linkedEntry.contactName}. Amount, date, time and account changes update the Cashbook entry too.`
+                : `Records the ${linkedEntry.type === 'LOAN' ? 'loan from' : 'money lent to'} ${linkedEntry.contactName}. Date, time and account changes update the Cashbook entry too.`}
+            </Text>
+          </View>
+        )}
+
         {type !== 'TRANSFER' ? (
           <View style={styles.fieldColumns}>
             <View style={styles.fieldColumn}>
@@ -220,36 +239,9 @@ export function QuickAddModal() {
           </>
         )}
 
-        <Text style={[typography.label, { marginTop: 16 }]}>DATE</Text>
-        <TouchableOpacity style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
-          <MaterialCommunityIcons name="calendar" size={18} color={colors.textSecondary} />
-          <Text style={typography.body}>{format(date, 'MMM d, yyyy - h:mm a')}</Text>
-        </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onValueChange={(_, selected) => {
-              setShowDatePicker(false);
-              setDate(selected);
-              if (Platform.OS === 'android') setShowTimePicker(true);
-            }}
-            onDismiss={() => setShowDatePicker(false)}
-          />
-        )}
-        {showTimePicker && (
-          <DateTimePicker
-            value={date}
-            mode="time"
-            display="default"
-            onValueChange={(_, selected) => {
-              setShowTimePicker(false);
-              setDate(selected);
-            }}
-            onDismiss={() => setShowTimePicker(false)}
-          />
-        )}
+        <View style={{ marginTop: 16 }}>
+          <DateTimeFields value={date} onChange={setDate} dateLabel="TRANSACTION DATE" timeLabel="TRANSACTION TIME" />
+        </View>
 
         <Text style={[typography.label, { marginTop: 16 }]}>NOTE</Text>
         <TextInput
@@ -313,7 +305,7 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
     amountText: { textAlign: 'center', fontSize: 40, fontWeight: '700', marginVertical: 16 },
     fieldColumns: { flexDirection: 'row', gap: 12 },
     fieldColumn: { flex: 1, minWidth: 0 },
-    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+    linkedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
     noteInput: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary },
     deleteButton: { alignItems: 'center', marginTop: 20, paddingVertical: 10 },
   });

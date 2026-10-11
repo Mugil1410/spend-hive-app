@@ -1,4 +1,4 @@
-import notifee, { Event, EventType } from '@notifee/react-native';
+import { notifee, Event, EventType } from './notifeeClient';
 import { navigationRef } from '@/navigation/navigationRef';
 import { useStore } from '@/store/useStore';
 
@@ -29,6 +29,7 @@ export async function onBackgroundNotificationEvent(event: Event) {
 
 /** Taps while the app is open. Returns the unsubscribe function. */
 export function subscribeForegroundNotificationTaps() {
+  if (!notifee) return () => {};
   return notifee.onForegroundEvent((event) => {
     const entryId = entryIdFrom(event);
     if (entryId) openEntry(entryId);
@@ -37,7 +38,7 @@ export function subscribeForegroundNotificationTaps() {
 
 /** Opens whatever a tap left pending (cold start or return from background). */
 export async function flushPendingNotificationTap() {
-  if (!pendingEntryId) {
+  if (!pendingEntryId && notifee) {
     const initial = await notifee.getInitialNotification();
     const id = initial?.notification.data?.entryId;
     if (typeof id === 'string') pendingEntryId = id;

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -11,6 +11,7 @@ import { FAB } from '@/components/FAB';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { formatCurrency } from '@/utils/formatCurrency';
+import { entryOutstanding } from '@/store/cashbookSync';
 
 export function DebtorsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -28,8 +29,7 @@ export function DebtorsScreen() {
         let pendingLoans = 0;
         let pendingLent = 0;
         for (const e of entries) {
-          const paid = e.installments.reduce((s, i) => s + i.paidAmount, 0);
-          const remaining = Math.max(0, e.totalAmount - paid);
+          const remaining = entryOutstanding(e);
           if (e.type === 'LOAN') {
             totalLoans += e.totalAmount;
             pendingLoans += remaining;

@@ -1,4 +1,5 @@
 import { generateId } from '@/utils/id';
+import { linkCashbookPayments } from './cashbookSync';
 
 // Zustand `persist` schema versioning for the app's single AsyncStorage-backed store.
 //
@@ -8,7 +9,7 @@ import { generateId } from '@/utils/id';
 // remove existing keys. Each step should defensively guard array reads with
 // `Array.isArray(...)` since `migrate` runs on raw, possibly-partial persisted JSON
 // (e.g. from an older app version, or a restored backup).
-export const CURRENT_VERSION = 3;
+export const CURRENT_VERSION = 4;
 
 type Migration = (state: any) => any;
 
@@ -58,6 +59,12 @@ const migrations: Record<number, Migration> = {
     ...state,
     events: Array.isArray(state?.events) ? state.events : [],
   }),
+
+  // 4: per-payment Cashbook records. Each existing repayment transaction (already tagged
+  // with cashbookRef.entryId + installmentId) gets a CashbookPayment and a paymentId, so
+  // later edits on either side stay in sync. Additive; paidAmount values are preserved.
+  // Account.monthlyLimit and CashbookEntry.closedAt are optional and need no backfill.
+  4: (state) => linkCashbookPayments(state, generateId),
 };
 
 export function runMigrations(persistedState: unknown, fromVersion: number): any {

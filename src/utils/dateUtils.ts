@@ -99,3 +99,30 @@ export function toDateKey(date: Date): string {
 export function periodKeyForMonth(date: Date): string {
   return format(date, 'yyyy-MM');
 }
+
+// Transaction dates are stored as one ISO timestamp; these split/merge its local date and
+// time so the two can be picked and shown separately.
+export const DATE_DISPLAY_FORMAT = 'MMM d, yyyy';
+export const TIME_DISPLAY_FORMAT = 'h:mm a';
+
+export function formatDisplayDate(value: Date | string): string {
+  return format(typeof value === 'string' ? new Date(value) : value, DATE_DISPLAY_FORMAT);
+}
+
+export function formatDisplayTime(value: Date | string): string {
+  return format(typeof value === 'string' ? new Date(value) : value, TIME_DISPLAY_FORMAT);
+}
+
+/** Calendar day from `day`, time of day from `current`. */
+export function withDatePart(current: Date, day: Date): Date {
+  const next = new Date(current);
+  next.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
+  return next;
+}
+
+/** Hours/minutes from `time`, calendar day from `current`. */
+export function withTimePart(current: Date, time: Date): Date {
+  const next = new Date(current);
+  next.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  return next;
+}

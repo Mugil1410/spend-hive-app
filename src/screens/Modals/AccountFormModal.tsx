@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
@@ -29,12 +29,23 @@ export function AccountFormModal() {
   const [initialBalance, setInitialBalance] = useState(editing ? String(editing.initialBalance) : '0');
   const [icon, setIcon] = useState(editing?.icon ?? ICONS[0]);
   const [color, setColor] = useState(editing?.color ?? COLORS[0]);
+  const [monthlyLimit, setMonthlyLimit] = useState(editing?.monthlyLimit ? String(editing.monthlyLimit) : '');
 
-  const canSave = name.trim().length > 0;
+  const parsedLimit = parseFloat(monthlyLimit);
+  const limitValid = monthlyLimit.trim() === '' || parsedLimit > 0;
+  const canSave = name.trim().length > 0 && limitValid;
 
   function handleSave() {
     if (!canSave) return;
-    const payload = { name: name.trim(), type, initialBalance: parseFloat(initialBalance) || 0, icon, color };
+    const payload = {
+      name: name.trim(),
+      type,
+      initialBalance: parseFloat(initialBalance) || 0,
+      icon,
+      color,
+      // Explicit undefined so clearing the field removes the limit on edit.
+      monthlyLimit: parsedLimit > 0 ? parsedLimit : undefined,
+    };
     if (editingId) updateAccount(editingId, payload);
     else addAccount(payload);
     navigation.goBack();
@@ -85,6 +96,20 @@ export function AccountFormModal() {
           keyboardType="decimal-pad"
           placeholderTextColor={colors.textSecondary}
         />
+
+        <Text style={[typography.label, { marginTop: 16 }]}>MONTHLY SPENDING LIMIT (OPTIONAL)</Text>
+        <TextInput
+          style={styles.input}
+          value={monthlyLimit}
+          onChangeText={setMonthlyLimit}
+          keyboardType="decimal-pad"
+          placeholder="e.g. 10000 for UPI Circle"
+          placeholderTextColor={colors.textSecondary}
+        />
+        <Text style={[typography.caption, { marginTop: 6 }]}>
+          For limit-based accounts like UPI Circle. The available amount resets automatically on the 1st of every
+          month - don't add an income transaction to restore it. Limit accounts are left out of Total Balance.
+        </Text>
 
         <Text style={[typography.label, { marginTop: 16 }]}>ICON</Text>
         <View style={styles.pillsRow}>

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
@@ -14,7 +14,8 @@ import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { sumByType } from '@/utils/calculations';
 import { formatSignedAmount } from '@/utils/formatCurrency';
-import { format } from 'date-fns';
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dateUtils';
+import { requestDeleteTransaction } from '@/utils/transactionActions';
 
 export function EventDetailScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -22,7 +23,7 @@ export function EventDetailScreen() {
   const { eventId } = route.params;
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { events, transactions, categories, accounts, deleteTransaction, updateEvent } = useStore();
+  const { events, transactions, categories, accounts, updateEvent } = useStore();
   const event = events.find((e) => e.id === eventId);
 
   const filtered = useMemo(() => {
@@ -85,7 +86,7 @@ export function EventDetailScreen() {
           return (
             <Swipeable
               renderRightActions={() => (
-                <TouchableOpacity style={styles.deleteAction} onPress={() => deleteTransaction(item.id)}>
+                <TouchableOpacity style={styles.deleteAction} onPress={() => requestDeleteTransaction(item.id)}>
                   <MaterialCommunityIcons name="trash-can-outline" size={22} color="#fff" />
                 </TouchableOpacity>
               )}
@@ -106,7 +107,7 @@ export function EventDetailScreen() {
                     <View style={styles.accountBadge}>
                       <Text style={styles.accountBadgeText}>{account?.name ?? '—'}</Text>
                     </View>
-                    <Text style={typography.caption}>{format(new Date(item.date), 'MMM d, yyyy')}</Text>
+                    <Text style={typography.caption}>{formatDisplayDate(item.date)} · {formatDisplayTime(item.date)}</Text>
                   </View>
                 </View>
                 <Text

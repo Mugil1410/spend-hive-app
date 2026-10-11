@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-nativ
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useDrawerStatus } from '@react-navigation/drawer';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeContext';
 import { BottomTabParamList } from './types';
@@ -24,10 +24,11 @@ const VISIBLE_ICONS: Record<string, string> = {
   Analysis: 'chart-donut',
   Budgets: 'wallet-outline',
   Accounts: 'bank-outline',
-  Categories: 'shape-outline',
+  Cashbook: 'handshake-outline',
 };
 
-const HIDDEN_TABS: (keyof BottomTabParamList)[] = ['Cashbook', 'Events', 'Settings', 'Preferences'];
+// Reached from the drawer (sidebar) menu instead of the bottom bar.
+const HIDDEN_TABS: (keyof BottomTabParamList)[] = ['Categories', 'Events', 'Settings', 'Preferences'];
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -88,8 +89,8 @@ export function BottomTabNavigator() {
         <Tab.Screen name="Analysis" component={AnalysisScreen} />
         <Tab.Screen name="Budgets" component={BudgetsScreen} />
         <Tab.Screen name="Accounts" component={AccountsScreen} />
-        <Tab.Screen name="Categories" component={CategoriesScreen} />
         <Tab.Screen name="Cashbook" component={CashbookScreen} />
+        <Tab.Screen name="Categories" component={CategoriesScreen} />
         <Tab.Screen name="Events" component={EventsScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
         <Tab.Screen name="Preferences" component={PreferencesScreen} />

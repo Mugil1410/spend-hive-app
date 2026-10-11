@@ -1,11 +1,12 @@
-import notifee, {
+import {
+  notifee,
   AndroidImportance,
   AndroidNotificationSetting,
   AuthorizationStatus,
   RepeatFrequency,
   TimestampTrigger,
   TriggerType,
-} from '@notifee/react-native';
+} from './notifeeClient';
 import { CashbookEntry } from '@/types';
 import { NotificationSettings } from '@/store/useStore';
 import { currencySymbol } from '@/utils/currency';
@@ -23,22 +24,44 @@ export interface ReminderInputs {
 
 /** Asks for notification permission (Android 13+ shows the system prompt). Returns true if granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (!notifee) return false;
   const settings = await notifee.requestPermission();
   return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
 }
 
 /** Whether Android lets us fire at an exact time ("Alarms & reminders" special access, Android 12+). */
 export async function canScheduleExactAlarms(): Promise<boolean> {
+  if (!notifee) return false;
   const settings = await notifee.getNotificationSettings();
   return settings.android.alarm === AndroidNotificationSetting.ENABLED;
 }
 
-export function openAlarmPermissionSettings() {
-  return notifee.openAlarmPermissionSettings();
+export async function openAlarmPermissionSettings() {
+  await notifee?.openAlarmPermissionSettings();
 }
 
-export function openNotificationSettings() {
-  return notifee.openNotificationSettings();
+export async function openNotificationSettings() {
+  await notifee?.openNotificationSettings();
+}
+
+/**
+ * Shows a notification immediately on the reminders channel, so the user can check that
+ * permission, channel sound/importance and the icon all work. Returns false if not permitted.
+ */
+export async function sendTestNotification(): Promise<boolean> {
+  if (!notifee || !(await requestNotificationPermission())) return false;
+  await notifee.createChannel({ id: CHANNEL_ID, name: 'Reminders', importance: AndroidImportance.HIGH });
+  await notifee.displayNotification({
+    id: 'test-notification',
+    title: 'SpendHive test notification',
+    body: 'Notifications are working. Your reminders will look like this.',
+    android: {
+      channelId: CHANNEL_ID,
+      smallIcon: 'ic_notification',
+      pressAction: { id: 'default', launchActivity: 'default' },
+    },
+  });
+  return true;
 }
 
 function atTime(day: Date, hhmm: string): Date {
@@ -53,6 +76,7 @@ function atTime(day: Date, hhmm: string): Date {
  * on any relevant change: it only touches local AlarmManager entries.
  */
 export async function rescheduleReminders({ notificationSettings: s, cashbookEntries, currency }: ReminderInputs) {
+  if (!notifee) return;
   await notifee.cancelTriggerNotifications();
   if (!s.enabled) return;
 
@@ -94,6 +118,7 @@ export async function rescheduleReminders({ notificationSettings: s, cashbookEnt
   const due: { at: Date; entry: CashbookEntry; remaining: number; installmentId: string }[] = [];
   for (const entry of cashbookEntries) {
     if (entry.type === 'LOAN' ? !s.loanDueEnabled : !s.lentDueEnabled) continue;
+    if (entry.closedAt) continue; // closed entries are no longer collected/paid
     for (const inst of entry.installments) {
       if (inst.status === 'PAID') continue;
       const at = atTime(new Date(inst.dueDate), s.dailyReminderTime);

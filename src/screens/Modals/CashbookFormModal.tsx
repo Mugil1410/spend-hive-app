@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollVi
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radius } from '@/theme/colors';
 import { useTheme } from '@/theme/ThemeContext';
 import { FormScreen } from '@/components/FormScreen';
+import { DateTimeFields } from '@/components/DateTimeFields';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { addDays, format } from 'date-fns';
@@ -36,7 +37,8 @@ export function CashbookFormModal() {
   );
 
   const [contactName, setContactName] = useState(editing?.contactName ?? '');
-  const [accountId, setAccountId] = useState<string | undefined>(editing?.accountId ?? sortedAccounts[0]?.id);
+  // No default account for a new entry - it creates a transaction, so the user picks explicitly.
+  const [accountId, setAccountId] = useState<string | undefined>(editing?.accountId);
   const [note, setNote] = useState(editing?.note ?? '');
   const [totalAmount, setTotalAmount] = useState(editing ? String(editing.totalAmount) : '');
   const [multiDue, setMultiDue] = useState((editing?.installments.length ?? 1) > 1);
@@ -48,8 +50,6 @@ export function CashbookFormModal() {
   );
   const [datePickerIndex, setDatePickerIndex] = useState<number | null>(null);
   const [createdAt, setCreatedAt] = useState(editing ? new Date(editing.createdAt) : new Date());
-  const [showCreatedAtPicker, setShowCreatedAtPicker] = useState(false);
-  const [showCreatedAtTimePicker, setShowCreatedAtTimePicker] = useState(false);
 
   const contactSuggestions = useMemo(() => {
     const q = contactName.trim().toLowerCase();
@@ -176,36 +176,9 @@ export function CashbookFormModal() {
           </>
         )}
 
-        <Text style={[typography.label, { marginTop: 16 }]}>CREATED ON</Text>
-        <TouchableOpacity style={styles.createdAtRow} onPress={() => setShowCreatedAtPicker(true)}>
-          <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.textSecondary} />
-          <Text style={typography.body}>{format(createdAt, 'MMM d, yyyy - h:mm a')}</Text>
-        </TouchableOpacity>
-        {showCreatedAtPicker && (
-          <DateTimePicker
-            value={createdAt}
-            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onValueChange={(_, selected) => {
-              setShowCreatedAtPicker(false);
-              setCreatedAt(selected);
-              if (Platform.OS === 'android') setShowCreatedAtTimePicker(true);
-            }}
-            onDismiss={() => setShowCreatedAtPicker(false)}
-          />
-        )}
-        {showCreatedAtTimePicker && (
-          <DateTimePicker
-            value={createdAt}
-            mode="time"
-            display="default"
-            onValueChange={(_, selected) => {
-              setShowCreatedAtTimePicker(false);
-              setCreatedAt(selected);
-            }}
-            onDismiss={() => setShowCreatedAtTimePicker(false)}
-          />
-        )}
+        <View style={{ marginTop: 16 }}>
+          <DateTimeFields value={createdAt} onChange={setCreatedAt} dateLabel="CREATED ON" timeLabel="TIME" />
+        </View>
 
         {!editing && (
           <>
@@ -322,18 +295,6 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       overflow: 'hidden',
     },
     suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
-    createdAtRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginTop: 8,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      backgroundColor: colors.surface,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
     pillsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
     pill: {
       paddingVertical: 8,

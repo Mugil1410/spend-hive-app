@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import BootSplash from 'react-native-bootsplash';
+import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AppSplashScreen } from '@/components/AppSplashScreen';
 import { useStore } from '@/store/useStore';
 import { useNotifications } from '@/notifications/useNotifications';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ fade: true });
 
 function AppContent() {
   const { colors, scheme } = useTheme();
@@ -16,7 +19,7 @@ function AppContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
-        <StatusBar barStyle={scheme === 'light' ? 'dark-content' : 'light-content'} />
+        <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
         <RootNavigator />
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -34,7 +37,7 @@ export default function App() {
   }, [hydrated]);
 
   useEffect(() => {
-    if (hydrated) BootSplash.hide({ fade: true }).catch(() => {});
+    if (hydrated) SplashScreen.hideAsync().catch(() => {});
   }, [hydrated]);
 
   if (!hydrated) {

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SectionList, TextInput, TouchableOpacity } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@/theme/ThemeContext';
@@ -15,7 +15,8 @@ import { TransactionFilterModal, TransactionFilters, DEFAULT_TRANSACTION_FILTERS
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import { DisplayOptions, Transaction } from '@/types';
-import { getRangeForAnchor, groupHeaderLabel } from '@/utils/dateUtils';
+import { formatDisplayTime, getRangeForAnchor, groupHeaderLabel } from '@/utils/dateUtils';
+import { requestDeleteTransaction } from '@/utils/transactionActions';
 import { filterTransactionsInRange, sumByType } from '@/utils/calculations';
 import { formatSignedAmount } from '@/utils/formatCurrency';
 
@@ -23,7 +24,7 @@ export function RecordsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors, typography), [colors, typography]);
-  const { transactions, categories, accounts, deleteTransaction } = useStore();
+  const { transactions, categories, accounts } = useStore();
 
   const [anchor, setAnchor] = useState(new Date());
   const [displayOptions, setDisplayOptions] = useState<DisplayOptions>({ range: 'MONTHLY', carryOver: false });
@@ -137,7 +138,7 @@ export function RecordsScreen() {
               renderRightActions={() => (
                 <TouchableOpacity
                   style={styles.deleteAction}
-                  onPress={() => deleteTransaction(item.id)}
+                  onPress={() => requestDeleteTransaction(item.id)}
                 >
                   <MaterialCommunityIcons name="trash-can-outline" size={22} color="#fff" />
                 </TouchableOpacity>
@@ -159,6 +160,7 @@ export function RecordsScreen() {
                     <View style={styles.accountBadge}>
                       <Text style={styles.accountBadgeText}>{account?.name ?? '—'}</Text>
                     </View>
+                    <Text style={typography.caption}>{formatDisplayTime(item.date)}</Text>
                   </View>
                 </View>
                 <Text
