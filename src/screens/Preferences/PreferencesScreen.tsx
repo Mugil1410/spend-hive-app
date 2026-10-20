@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialDesignIcons as MaterialCommunityIcons } from '@react-native-vector-icons/material-design-icons/static';
 import { useTheme } from '@/theme/ThemeContext';
 import { TopHeader } from '@/components/TopHeader';
 import { Card } from '@/components/Card';
@@ -38,7 +38,13 @@ export function PreferencesScreen() {
   const selectedCurrency = CURRENCIES.find((c) => c.code === currency);
 
   async function handleTestNotification() {
-    const sent = await sendTestNotification().catch(() => false);
+    let sent: boolean;
+    try {
+      sent = await sendTestNotification();
+    } catch (e) {
+      Alert.alert('Test Notification Failed', e instanceof Error ? e.message : String(e));
+      return;
+    }
     if (!sent) {
       Alert.alert(
         'Notifications Blocked',

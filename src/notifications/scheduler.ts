@@ -7,6 +7,7 @@ import {
   TimestampTrigger,
   TriggerType,
 } from './notifeeClient';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { CashbookEntry } from '@/types';
 import { NotificationSettings } from '@/store/useStore';
 import { currencySymbol } from '@/utils/currency';
@@ -22,26 +23,43 @@ export interface ReminderInputs {
   currency: string;
 }
 
+const POST_NOTIFICATIONS = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+const needsRuntimePermission = Platform.OS === 'android' && Number(Platform.Version) >= 33;
+
+/**
+ * Whether notifications are currently allowed, without prompting. Some OEM skins (Vivo/iQOO
+ * OriginOS, Xiaomi) report Notifee's status inconsistently, so the Android runtime permission
+ * counts as a second source of truth.
+ */
+export async function hasNotificationPermission(): Promise<boolean> {
+  const settings = await notifee.getNotificationSettings();
+  if (settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED) return true;
+  return needsRuntimePermission && (await PermissionsAndroid.check(POST_NOTIFICATIONS));
+}
+
 /** Asks for notification permission (Android 13+ shows the system prompt). Returns true if granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (!notifee) return false;
+  if (await hasNotificationPermission()) return true;
+  if (needsRuntimePermission) {
+    const result = await PermissionsAndroid.request(POST_NOTIFICATIONS);
+    if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
+  }
   const settings = await notifee.requestPermission();
   return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
 }
 
 /** Whether Android lets us fire at an exact time ("Alarms & reminders" special access, Android 12+). */
 export async function canScheduleExactAlarms(): Promise<boolean> {
-  if (!notifee) return false;
   const settings = await notifee.getNotificationSettings();
   return settings.android.alarm === AndroidNotificationSetting.ENABLED;
 }
 
 export async function openAlarmPermissionSettings() {
-  await notifee?.openAlarmPermissionSettings();
+  await notifee.openAlarmPermissionSettings();
 }
 
 export async function openNotificationSettings() {
-  await notifee?.openNotificationSettings();
+  await notifee.openNotificationSettings();
 }
 
 /**
@@ -49,7 +67,7 @@ export async function openNotificationSettings() {
  * permission, channel sound/importance and the icon all work. Returns false if not permitted.
  */
 export async function sendTestNotification(): Promise<boolean> {
-  if (!notifee || !(await requestNotificationPermission())) return false;
+  if (!(await requestNotificationPermission())) return false;
   await notifee.createChannel({ id: CHANNEL_ID, name: 'Reminders', importance: AndroidImportance.HIGH });
   await notifee.displayNotification({
     id: 'test-notification',
@@ -76,12 +94,11 @@ function atTime(day: Date, hhmm: string): Date {
  * on any relevant change: it only touches local AlarmManager entries.
  */
 export async function rescheduleReminders({ notificationSettings: s, cashbookEntries, currency }: ReminderInputs) {
-  if (!notifee) return;
   await notifee.cancelTriggerNotifications();
   if (!s.enabled) return;
 
+  if (!(await hasNotificationPermission())) return;
   const settings = await notifee.getNotificationSettings();
-  if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) return;
   const exact = settings.android.alarm === AndroidNotificationSetting.ENABLED;
 
   await notifee.createChannel({ id: CHANNEL_ID, name: 'Reminders', importance: AndroidImportance.HIGH });

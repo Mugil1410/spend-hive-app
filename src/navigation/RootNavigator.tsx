@@ -18,6 +18,7 @@ import { DebtorFormModal } from '@/screens/Modals/DebtorFormModal';
 import { EventFormModal } from '@/screens/Modals/EventFormModal';
 import { EventDetailScreen } from '@/screens/Events/EventDetailScreen';
 import { BackupPasswordModal } from '@/screens/Modals/BackupPasswordModal';
+import { BackupEncryptModal } from '@/screens/Modals/BackupEncryptModal';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -63,6 +64,7 @@ export function RootNavigator() {
           <Stack.Screen name="EventForm" component={EventFormModal} />
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="BackupPassword" component={BackupPasswordModal} />
+          <Stack.Screen name="BackupEncrypt" component={BackupEncryptModal} />
         </Stack.Group>
       </Stack.Navigator>
     </NavigationContainer>

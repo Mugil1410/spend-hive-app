@@ -1,16 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
 import { AppSplashScreen } from '@/components/AppSplashScreen';
 import { useStore } from '@/store/useStore';
 import { useNotifications } from '@/notifications/useNotifications';
-
-SplashScreen.preventAutoHideAsync().catch(() => {});
-SplashScreen.setOptions({ fade: true });
 
 function AppContent() {
   const { colors, scheme } = useTheme();
@@ -19,7 +15,7 @@ function AppContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
-        <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
+        <StatusBar barStyle={scheme === 'light' ? 'dark-content' : 'light-content'} />
         <RootNavigator />
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -36,10 +32,7 @@ export default function App() {
     return unsub;
   }, [hydrated]);
 
-  useEffect(() => {
-    if (hydrated) SplashScreen.hideAsync().catch(() => {});
-  }, [hydrated]);
-
+  // The native splash (MainActivity) hides on the first frame; this covers store hydration.
   if (!hydrated) {
     return <AppSplashScreen />;
   }

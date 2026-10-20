@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Text, TextInput, StyleSheet, Alert, ActivityIndicator, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -13,11 +13,11 @@ import {
   BackupFormatError,
   BackupPasswordError,
 } from '@/utils/backupCrypto';
-import { takePendingRestoreText } from '@/utils/pendingRestore';
+import { clearPendingRestoreText, peekPendingRestoreText } from '@/utils/pendingRestore';
 
 /**
- * Unlocks a legacy password-protected backup (made by older app versions). New backups are
- * plain JSON and restore straight from Settings without this screen.
+ * Unlocks a password-encrypted backup. Plain JSON backups restore straight from Settings
+ * without this screen.
  */
 export function BackupPasswordModal() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -27,9 +27,11 @@ export function BackupPasswordModal() {
 
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // Held for the screen's lifetime so a wrong password can be retried.
+  const [text] = useState(peekPendingRestoreText);
+  useEffect(() => clearPendingRestoreText, []);
 
   async function handleRestore() {
-    const text = takePendingRestoreText();
     if (!text) {
       Alert.alert('Restore Failed', 'No backup file was selected.');
       navigation.goBack();
@@ -88,8 +90,7 @@ export function BackupPasswordModal() {
       saveLabel="Restore"
     >
       <Text style={typography.caption}>
-        This backup was made by an older version of SpendHive and is password-protected. Enter the password used to
-        create it.
+        This backup is password-protected. Enter the password used to create it.
       </Text>
 
       <Text style={[typography.label, { marginTop: 16 }]}>PASSWORD</Text>

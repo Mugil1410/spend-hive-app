@@ -8,8 +8,10 @@ export function setPendingRestoreText(text: string): void {
   pendingRestoreText = text;
 }
 
-export function takePendingRestoreText(): string | null {
-  const text = pendingRestoreText;
+export function peekPendingRestoreText(): string | null {
+  return pendingRestoreText;
+}
+
+export function clearPendingRestoreText(): void {
   pendingRestoreText = null;
-  return text;
 }
