@@ -1,5 +1,6 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 import { CashbookType, TransactionType } from '@/types';
+import type { LockMethod } from '@/security/appLockStore';
 
 export type BottomTabParamList = {
   Records: undefined;
@@ -18,7 +19,7 @@ export type DrawerParamList = {
 };
 
 export type RootStackParamList = {
-  Drawer: undefined;
+  Drawer: NavigatorScreenParams<DrawerParamList> | undefined;
   QuickAdd: { transactionId?: string; type?: TransactionType; eventId?: string } | undefined;
   AccountForm: { accountId?: string } | undefined;
   CategoryForm: { categoryId?: string; type?: 'EXPENSE' | 'INCOME' } | undefined;
@@ -35,4 +36,9 @@ export type RootStackParamList = {
   BackupEncrypt: undefined;
   EventForm: { eventId?: string } | undefined;
   EventDetail: { eventId: string };
+  Notifications: undefined;
+  SystemAnalytics: undefined;
+  AppLockSettings: undefined;
+  // enable: create a credential; change/disable: verify the current one first.
+  AppLockSetup: { intent: 'enable' | 'change' | 'disable'; method?: LockMethod };
 };

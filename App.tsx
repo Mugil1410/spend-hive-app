@@ -1,45 +1,70 @@
-import React, { useEffect, useState } from 'react';
-import { StatusBar } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StatusBar, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@/theme/ThemeContext';
+import { darkColors } from '@/theme/colors';
 import { AppSplashScreen } from '@/components/AppSplashScreen';
 import { useStore } from '@/store/useStore';
 import { useNotifications } from '@/notifications/useNotifications';
+import { useAppLock } from '@/security/appLockStore';
+import { useAppLockLifecycle } from '@/security/useAppLockLifecycle';
+import { LockScreen } from '@/security/LockScreen';
 
 function AppContent() {
   const { colors, scheme } = useTheme();
+  const locked = useAppLock((s) => s.locked);
   useNotifications();
+  useAppLockLifecycle();
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
         <StatusBar barStyle={scheme === 'light' ? 'dark-content' : 'light-content'} />
         <RootNavigator />
+        {/* An overlay rather than a route, so locking keeps the navigation state underneath. */}
+        {locked && <LockScreen />}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-export default function App() {
-  const [hydrated, setHydrated] = useState(useStore.persist.hasHydrated());
+function useHydrated() {
+  const check = () => useStore.persist.hasHydrated() && useAppLock.getState().hydrated;
+  const [hydrated, setHydrated] = useState(check);
 
   useEffect(() => {
     if (hydrated) return;
-    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
-    if (useStore.persist.hasHydrated()) setHydrated(true);
-    return unsub;
+    const update = () => check() && setHydrated(true);
+    const unsubStore = useStore.persist.onFinishHydration(update);
+    const unsubLock = useAppLock.subscribe(update);
+    update();
+    return () => {
+      unsubStore();
+      unsubLock();
+    };
   }, [hydrated]);
 
-  // The native splash (MainActivity) hides on the first frame; this covers store hydration.
-  if (!hydrated) {
-    return <AppSplashScreen />;
-  }
+  return hydrated;
+}
 
+export default function App() {
+  // Wait for the lock state too, so a locked app never flashes its content.
+  const hydrated = useHydrated();
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+
+  // The native splash (MainActivity) hides on the first frame; the animated splash then covers
+  // store hydration and fades out over the app.
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <View style={{ flex: 1, backgroundColor: darkColors.background }}>
+      {hydrated && (
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      )}
+      {!splashDone && <AppSplashScreen ready={hydrated} onFinish={handleSplashFinish} />}
+    </View>
   );
 }

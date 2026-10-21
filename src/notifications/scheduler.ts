@@ -11,8 +11,8 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import { CashbookEntry } from '@/types';
 import { NotificationSettings } from '@/store/useStore';
 import { currencySymbol } from '@/utils/currency';
+import { ANDROID_DEFAULTS, CHANNEL_ID, notificationData, notify } from './NotificationService';
 
-const CHANNEL_ID = 'reminders';
 const DAILY_ID = 'daily-expense';
 // Android caps scheduled alarms per app (~500); keep the soonest ones only.
 const MAX_DUE_REMINDERS = 60;
@@ -68,18 +68,13 @@ export async function openNotificationSettings() {
  */
 export async function sendTestNotification(): Promise<boolean> {
   if (!(await requestNotificationPermission())) return false;
-  await notifee.createChannel({ id: CHANNEL_ID, name: 'Reminders', importance: AndroidImportance.HIGH });
-  await notifee.displayNotification({
-    id: 'test-notification',
-    title: 'SpendHive test notification',
+  return notify({
+    id: `test-${Date.now()}`,
+    title: 'Spend Hive test notification',
     body: 'Notifications are working. Your reminders will look like this.',
-    android: {
-      channelId: CHANNEL_ID,
-      smallIcon: 'ic_notification',
-      pressAction: { id: 'default', launchActivity: 'default' },
-    },
+    category: 'test',
+    target: { route: 'Notifications' },
   });
-  return true;
 }
 
 function atTime(day: Date, hhmm: string): Date {
@@ -111,11 +106,7 @@ export async function rescheduleReminders({ notificationSettings: s, cashbookEnt
     // Without the exact-alarm permission Android may delay delivery a bit; still fires.
     alarmManager: exact ? { allowWhileIdle: true } : undefined,
   });
-  const android = {
-    channelId: CHANNEL_ID,
-    smallIcon: 'ic_notification',
-    pressAction: { id: 'default', launchActivity: 'default' },
-  };
+  const android = ANDROID_DEFAULTS;
 
   if (s.dailyReminderEnabled) {
     let next = atTime(new Date(), s.dailyReminderTime);
@@ -124,7 +115,8 @@ export async function rescheduleReminders({ notificationSettings: s, cashbookEnt
       {
         id: DAILY_ID,
         title: 'Log today\'s spending',
-        body: 'Take a moment to add today\'s expenses to SpendHive.',
+        body: 'Take a moment to add today\'s expenses to Spend Hive.',
+        data: notificationData('daily', { route: 'QuickAdd' }),
         android,
       },
       trigger(next, RepeatFrequency.DAILY)
@@ -153,7 +145,10 @@ export async function rescheduleReminders({ notificationSettings: s, cashbookEnt
         id: `due-${d.installmentId}`,
         title: isLoan ? 'Loan payment due today' : 'Payment to collect today',
         body: isLoan ? `Pay ${amount} to ${d.entry.contactName}` : `${d.entry.contactName} owes you ${amount}`,
-        data: { entryId: d.entry.id },
+        data: notificationData(isLoan ? 'loan' : 'lent', {
+          route: 'CashbookEntryDetail',
+          params: { entryId: d.entry.id },
+        }),
         android,
       },
       trigger(d.at)

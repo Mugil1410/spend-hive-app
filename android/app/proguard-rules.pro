@@ -12,3 +12,7 @@
 # react-native-reanimated
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
+
+# SpendHive native modules (looked up by class name from ReactModuleInfo)
+-keep class com.spendhive.system.** { *; }
+-keep class com.spendhive.security.** { *; }

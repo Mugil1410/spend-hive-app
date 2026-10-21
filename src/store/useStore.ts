@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { appStorage } from './storage';
 import { CURRENT_VERSION, runMigrations } from './migrations';
 import { generateId } from '@/utils/id';
+import { DEFAULT_DARK_THEME_ID, DEFAULT_LIGHT_THEME_ID } from '@/theme/themes';
 import {
   Account,
   Category,
@@ -50,6 +51,9 @@ interface AppState {
   debtors: Debtor[];
   events: Event[];
   themeMode: ThemeMode;
+  // Preset ids from src/theme/themes.ts; themeMode picks which one is shown ('system' follows the OS).
+  darkThemeId: string;
+  lightThemeId: string;
   currency: string;
   notificationSettings: NotificationSettings;
 
@@ -141,6 +145,8 @@ interface AppState {
 
   // Preferences
   setThemeMode: (mode: ThemeMode) => void;
+  /** Selects a preset and switches to its scheme so the choice is visible immediately. */
+  setThemePreset: (id: string, scheme: 'light' | 'dark') => void;
   setCurrency: (code: string) => void;
   updateNotificationSettings: (patch: Partial<NotificationSettings>) => void;
 }
@@ -160,6 +166,8 @@ export const useStore = create<AppState>()(
       debtors: [],
       events: [],
       themeMode: 'dark',
+      darkThemeId: DEFAULT_DARK_THEME_ID,
+      lightThemeId: DEFAULT_LIGHT_THEME_ID,
       currency: 'INR',
       notificationSettings: {
         enabled: false,
@@ -472,6 +480,8 @@ export const useStore = create<AppState>()(
       },
 
       setThemeMode: (mode) => set({ themeMode: mode }),
+      setThemePreset: (id, scheme) =>
+        set(scheme === 'dark' ? { darkThemeId: id, themeMode: 'dark' } : { lightThemeId: id, themeMode: 'light' }),
       setCurrency: (code) => set({ currency: code }),
       updateNotificationSettings: (patch) => {
         set((state) => ({ notificationSettings: { ...state.notificationSettings, ...patch } }));
@@ -491,6 +501,8 @@ export const useStore = create<AppState>()(
         debtors: state.debtors,
         events: state.events,
         themeMode: state.themeMode,
+        darkThemeId: state.darkThemeId,
+        lightThemeId: state.lightThemeId,
         currency: state.currency,
         notificationSettings: state.notificationSettings,
       }),

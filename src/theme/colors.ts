@@ -17,6 +17,14 @@ export interface ColorPalette {
   fabBase: string;
 
   amber: string;
+
+  // Semantic aliases and surfaces added with the preset themes (src/theme/themes.ts).
+  secondary: string;
+  success: string;
+  warning: string;
+  error: string;
+  inputBackground: string;
+  navBackground: string;
 }
 
 export const darkColors: ColorPalette = {
@@ -38,6 +46,13 @@ export const darkColors: ColorPalette = {
   fabBase: '#3A3935',
 
   amber: '#E0A94A',
+
+  secondary: '#E0A94A',
+  success: '#50B98A',
+  warning: '#E0A94A',
+  error: '#E86759',
+  inputBackground: '#2E2D2A',
+  navBackground: '#343330',
 };
 
 export const lightColors: ColorPalette = {
@@ -59,6 +74,13 @@ export const lightColors: ColorPalette = {
   fabBase: '#EDEAE2',
 
   amber: '#B8792E',
+
+  secondary: '#B8792E',
+  success: '#2E9A66',
+  warning: '#B8792E',
+  error: '#D14C3D',
+  inputBackground: '#F3F1EC',
+  navBackground: '#FFFFFF',
 };
 
 export const radius = {

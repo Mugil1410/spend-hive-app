@@ -9,7 +9,7 @@ import { linkCashbookPayments } from './cashbookSync';
 // remove existing keys. Each step should defensively guard array reads with
 // `Array.isArray(...)` since `migrate` runs on raw, possibly-partial persisted JSON
 // (e.g. from an older app version, or a restored backup).
-export const CURRENT_VERSION = 4;
+export const CURRENT_VERSION = 5;
 
 type Migration = (state: any) => any;
 
@@ -65,6 +65,13 @@ const migrations: Record<number, Migration> = {
   // later edits on either side stay in sync. Additive; paidAmount values are preserved.
   // Account.monthlyLimit and CashbookEntry.closedAt are optional and need no backfill.
   4: (state) => linkCashbookPayments(state, generateId),
+
+  // 5: preset themes. Existing users keep the original palettes (Charcoal / Warm Sand).
+  5: (state) => ({
+    ...state,
+    darkThemeId: typeof state?.darkThemeId === 'string' ? state.darkThemeId : 'charcoal',
+    lightThemeId: typeof state?.lightThemeId === 'string' ? state.lightThemeId : 'warm-sand',
+  }),
 };
 
 export function runMigrations(persistedState: unknown, fromVersion: number): any {

@@ -44,7 +44,7 @@ function CustomDrawerContent({ navigation, state }: DrawerContentComponentProps)
         <View style={styles.logoCircle}>
           <MaterialCommunityIcons name="wallet" size={26} color={colors.gold} />
         </View>
-        <Text style={[typography.h1, { marginTop: 10 }]}>SpendHive</Text>
+        <Text style={[typography.h1, { marginTop: 10 }]}>Spend Hive</Text>
         <Text style={typography.caption}>100% Offline Finance Tracker</Text>
       </View>
       <View style={styles.menu}>

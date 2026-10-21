@@ -19,6 +19,10 @@ import { EventFormModal } from '@/screens/Modals/EventFormModal';
 import { EventDetailScreen } from '@/screens/Events/EventDetailScreen';
 import { BackupPasswordModal } from '@/screens/Modals/BackupPasswordModal';
 import { BackupEncryptModal } from '@/screens/Modals/BackupEncryptModal';
+import { NotificationsScreen } from '@/screens/Notifications/NotificationsScreen';
+import { SystemAnalyticsScreen } from '@/screens/SystemAnalytics/SystemAnalyticsScreen';
+import { AppLockSettingsScreen } from '@/screens/Security/AppLockSettingsScreen';
+import { AppLockSetupScreen } from '@/screens/Security/AppLockSetupScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -27,6 +31,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       QuickAdd: 'quickadd',
+      Notifications: 'notifications',
     },
   },
 };
@@ -51,6 +56,11 @@ export function RootNavigator() {
     <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking} onReady={handleNavigationReady}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Drawer" component={DrawerNavigator} />
+        <Stack.Group screenOptions={{ ...TransitionPresets.SlideFromRightIOS }}>
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="SystemAnalytics" component={SystemAnalyticsScreen} />
+          <Stack.Screen name="AppLockSettings" component={AppLockSettingsScreen} />
+        </Stack.Group>
         <Stack.Group screenOptions={{ ...TransitionPresets.ModalSlideFromBottomIOS, presentation: 'modal' }}>
           <Stack.Screen name="QuickAdd" component={QuickAddModal} />
           <Stack.Screen name="AccountForm" component={AccountFormModal} />
@@ -65,6 +75,7 @@ export function RootNavigator() {
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="BackupPassword" component={BackupPasswordModal} />
           <Stack.Screen name="BackupEncrypt" component={BackupEncryptModal} />
+          <Stack.Screen name="AppLockSetup" component={AppLockSetupScreen} />
         </Stack.Group>
       </Stack.Navigator>
     </NavigationContainer>

@@ -5,10 +5,13 @@
   "private": true,
   "scripts": {
     "start": "react-native start",
-    "android": "set \"JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.101-hotspot\" && react-native run-android",
-    "android:release": "set \"JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.101-hotspot\" && cd android && gradlew.bat assembleRelease",
+    "android": "set \"JAVA_HOME=%npm_package_config_java_home%\" && react-native run-android",
+    "android:release": "set \"JAVA_HOME=%npm_package_config_java_home%\" && cd android && gradlew.bat assembleRelease",
     "ios": "react-native run-ios",
     "typecheck": "tsc --noEmit"
+  },
+  "config": {
+    "java_home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.101-hotspot"
   },
   "dependencies": {
     "@dr.pogodin/react-native-fs": "^2.40.3",

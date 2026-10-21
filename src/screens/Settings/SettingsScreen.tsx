@@ -15,6 +15,8 @@ import { setPendingRestoreText } from '@/utils/pendingRestore';
 import { parseDbBackupJson, DbBackup } from '@/utils/dbBackup';
 import { saveAndShare } from '@/utils/backupFile';
 import { format } from 'date-fns';
+import { useAppLock } from '@/security/appLockStore';
+import { describeTimeout, METHOD_LABELS } from '@/security/AppLockService';
 
 function tryParsePlainBackup(text: string): DbBackup | null {
   try {
@@ -41,6 +43,9 @@ export function SettingsScreen() {
     deleteAllTransactions,
     importData,
   } = useStore();
+  const lockEnabled = useAppLock((s) => s.enabled);
+  const lockMethod = useAppLock((s) => s.method);
+  const lockTimeout = useAppLock((s) => s.timeoutMinutes);
 
   async function handleExportTransactions() {
     try {
@@ -118,7 +123,31 @@ export function SettingsScreen() {
     <View style={styles.container}>
       <TopHeader title="Settings" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={typography.label}>BACKUP</Text>
+        <Text style={typography.label}>SECURITY</Text>
+        <Card>
+          <SettingsRow
+            icon={lockEnabled ? 'lock-check-outline' : 'lock-open-variant-outline'}
+            label="App Lock"
+            description={
+              lockEnabled && lockMethod
+                ? `On · ${METHOD_LABELS[lockMethod]} · ${describeTimeout(lockTimeout)}`
+                : 'Off · Protect Spend Hive with a PIN, passcode or pattern'
+            }
+            onPress={() => navigation.navigate('AppLockSettings')}
+          />
+        </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>SYSTEM</Text>
+        <Card>
+          <SettingsRow
+            icon="chart-box-outline"
+            label="System Analytics"
+            description="Live RAM, CPU, storage and network usage on this phone"
+            onPress={() => navigation.navigate('SystemAnalytics')}
+          />
+        </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>BACKUP</Text>
         <Card>
           <SettingsRow
             icon="content-save-outline"

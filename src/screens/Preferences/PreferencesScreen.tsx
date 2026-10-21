@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform, Alert, AppState } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialDesignIcons as MaterialCommunityIcons } from '@react-native-vector-icons/material-design-icons/static';
 import { useTheme } from '@/theme/ThemeContext';
@@ -11,10 +12,47 @@ import { CURRENCIES } from '@/utils/currency';
 import {
   requestNotificationPermission,
   canScheduleExactAlarms,
+  hasNotificationPermission,
   openAlarmPermissionSettings,
   openNotificationSettings,
   sendTestNotification,
 } from '@/notifications/scheduler';
+import { notifee } from '@/notifications/notifeeClient';
+import { ThemeGallery } from './ThemeGallery';
+
+interface BackgroundStatus {
+  permission: boolean;
+  exactAlarms: boolean;
+  batteryOptimized: boolean;
+}
+
+/** Whether Android lets reminders through: permission, exact alarms and battery optimization. */
+function useBackgroundStatus() {
+  const [status, setStatus] = useState<BackgroundStatus | null>(null);
+  const check = useCallback(async () => {
+    try {
+      const [permission, exactAlarms, batteryOptimized] = await Promise.all([
+        hasNotificationPermission(),
+        canScheduleExactAlarms(),
+        Platform.OS === 'android' ? notifee.isBatteryOptimizationEnabled() : Promise.resolve(false),
+      ]);
+      setStatus({ permission, exactAlarms, batteryOptimized });
+    } catch {
+      setStatus(null);
+    }
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      check();
+    }, [check])
+  );
+  // Returning from system settings may have changed any of these.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
+    return () => sub.remove();
+  }, [check]);
+  return status;
+}
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -30,6 +68,7 @@ export function PreferencesScreen() {
     useStore();
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const background = useBackgroundStatus();
 
   const currencyOptions: SelectOption[] = CURRENCIES.map((c) => ({
     id: c.code,
@@ -112,6 +151,7 @@ export function PreferencesScreen() {
 
         <Text style={[typography.label, { marginTop: 16 }]}>APP THEME</Text>
         <Card>
+          <Text style={[typography.caption, { marginBottom: 8 }]}>Mode</Text>
           <View style={styles.segmentRow}>
             {THEME_OPTIONS.map((opt) => {
               const active = themeMode === opt.value;
@@ -128,7 +168,13 @@ export function PreferencesScreen() {
               );
             })}
           </View>
+          <Text style={[typography.caption, { marginTop: 12 }]}>
+            {themeMode === 'system'
+              ? 'Follows your phone: your dark theme in dark mode, your light theme otherwise.'
+              : 'Pick a theme below; choosing one also switches to its mode.'}
+          </Text>
         </Card>
+        <ThemeGallery />
 
         <Text style={[typography.label, { marginTop: 16 }]}>NOTIFICATIONS</Text>
         <Card>
@@ -148,6 +194,53 @@ export function PreferencesScreen() {
             </View>
             <Text style={[typography.body, { color: colors.gold, fontWeight: '700' }]}>Test now</Text>
           </TouchableOpacity>
+        </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>BACKGROUND ACCESS</Text>
+        <Card>
+          <Text style={[typography.caption, { marginBottom: 4 }]}>
+            Reminders are scheduled with Android alarms, so Spend Hive doesn't need to keep running. These settings
+            only affect whether reminders arrive on time.
+          </Text>
+          <AccessRow
+            icon="bell-check-outline"
+            label="Notification permission"
+            ok={background?.permission}
+            okText="Allowed"
+            badText="Blocked"
+            onFix={() => openNotificationSettings()}
+          />
+          <View style={styles.divider} />
+          <AccessRow
+            icon="alarm-check"
+            label="Alarms & reminders"
+            ok={background?.exactAlarms}
+            okText="Allowed"
+            badText="May be late"
+            onFix={() => openAlarmPermissionSettings()}
+          />
+          {Platform.OS === 'android' && (
+            <>
+              <View style={styles.divider} />
+              <AccessRow
+                icon="battery-heart-variant"
+                label="Background activity"
+                ok={background ? !background.batteryOptimized : undefined}
+                okText="Unrestricted"
+                badText="Battery optimized"
+                onFix={() =>
+                  Alert.alert(
+                    'Allow Background Activity',
+                    'Some phones (Xiaomi, Vivo, Oppo, Samsung…) delay or drop reminders for battery-optimized apps. Set Spend Hive to "Don’t optimize" / "Unrestricted" on the next screen.',
+                    [
+                      { text: 'Not Now', style: 'cancel' },
+                      { text: 'Open Settings', onPress: () => notifee.openBatteryOptimizationSettings() },
+                    ]
+                  )
+                }
+              />
+            </>
+          )}
         </Card>
 
         <Text style={[typography.label, { marginTop: 16 }]}>REMINDERS</Text>
@@ -233,6 +326,40 @@ function formatTime(hour: number, minute: number): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${h12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+function AccessRow({
+  icon,
+  label,
+  ok,
+  okText,
+  badText,
+  onFix,
+}: {
+  icon: string;
+  label: string;
+  ok: boolean | undefined;
+  okText: string;
+  badText: string;
+  onFix: () => void;
+}) {
+  const { colors, typography } = useTheme();
+  return (
+    <TouchableOpacity
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 }}
+      onPress={onFix}
+      disabled={ok !== false}
+    >
+      <MaterialCommunityIcons name={icon as any} size={22} color={colors.gold} />
+      <View style={{ flex: 1 }}>
+        <Text style={typography.body}>{label}</Text>
+        <Text style={[typography.caption, { color: ok == null ? colors.textSecondary : ok ? colors.income : colors.amber }]}>
+          {ok == null ? 'Checking…' : ok ? okText : badText}
+        </Text>
+      </View>
+      {ok === false && <Text style={[typography.body, { color: colors.gold, fontWeight: '700' }]}>Fix</Text>}
+    </TouchableOpacity>
+  );
 }
 
 function ToggleRow({
