@@ -1,5 +1,5 @@
 import { Alert, Platform } from 'react-native';
-import { CachesDirectoryPath, DocumentDirectoryPath, writeFile } from '@dr.pogodin/react-native-fs';
+import { CachesDirectoryPath, writeFile } from '@dr.pogodin/react-native-fs';
 import Share from 'react-native-share';
 import { saveDocuments } from '@react-native-documents/picker';
 
@@ -21,9 +21,13 @@ async function saveToChosenFolder(fileName: string, contents: string, mimeType: 
   }
 }
 
-/** Writes to the app's sandboxed documents dir and opens the share sheet. */
+/**
+ * Writes to the app's cache dir and opens the share sheet. It must be the cache dir:
+ * react-native-share's FileProvider only exposes cache/ and Download/, so sharing a file from
+ * the documents dir fails on Android.
+ */
 export async function saveAndShare(fileName: string, contents: string, mimeType: string, dialogTitle: string) {
-  const path = `${DocumentDirectoryPath}/${fileName}`;
+  const path = `${CachesDirectoryPath}/${fileName}`;
   await writeFile(path, contents, 'utf8');
   await Share.open({ url: `file://${path}`, type: mimeType, filename: fileName, title: dialogTitle, failOnCancel: false });
 }

@@ -4,7 +4,8 @@ import { randomBytes } from '@noble/ciphers/utils.js';
 import { SecureStore } from '@/native/SecureStore';
 import { bytesToBase64, base64ToBytes } from '@/utils/base64';
 import { stringToUtf8Bytes } from '@/utils/utf8';
-import { useAppLock, LockMethod } from './appLockStore';
+import { AppState } from 'react-native';
+import { useAppLock, LockMethod, CustomLockMethod } from './appLockStore';
 
 const CREDENTIAL_KEY = 'appLockCredential';
 const ITERATIONS = 10_000;
@@ -28,13 +29,18 @@ export const TIMEOUT_PRESETS: { minutes: number; label: string }[] = [
 ];
 
 export const METHOD_LABELS: Record<LockMethod, string> = {
+  device: 'Phone security',
   pin: 'PIN',
   passcode: 'Passcode',
   pattern: 'Pattern',
 };
 
+export function isCustomMethod(method: LockMethod | null): method is CustomLockMethod {
+  return method === 'pin' || method === 'passcode' || method === 'pattern';
+}
+
 interface StoredCredential {
-  method: LockMethod;
+  method: CustomLockMethod;
   saltB64: string;
   hashB64: string;
   iterations: number;
@@ -67,7 +73,7 @@ export function validateCustomTimeout(text: string): string | null {
 }
 
 /** Validates a new secret for the method; returns an error message or null. */
-export function validateSecret(method: LockMethod, secret: string): string | null {
+export function validateSecret(method: CustomLockMethod, secret: string): string | null {
   switch (method) {
     case 'pin':
       if (!/^\d+$/.test(secret)) return 'PIN must contain digits only.';
@@ -83,8 +89,8 @@ export function validateSecret(method: LockMethod, secret: string): string | nul
   }
 }
 
-/** Saves a new credential and turns App Lock on with it. */
-export async function setCredential(method: LockMethod, secret: string) {
+/** Saves a new custom credential and turns App Lock on with it. */
+export async function setCredential(method: CustomLockMethod, secret: string) {
   const salt = randomBytes(16);
   const hash = await hashSecret(secret, salt, ITERATIONS);
   const stored: StoredCredential = {
@@ -128,39 +134,62 @@ export async function verifySecret(secret: string): Promise<VerifyResult> {
   return { ok: false, lockoutUntil: until, attemptsLeft: Math.max(FREE_ATTEMPTS - attempts, 0) };
 }
 
+/** Turns App Lock on using the phone's own biometrics / screen lock (any custom credential is wiped). */
+export async function enableDeviceLock() {
+  await SecureStore.deleteItem(CREDENTIAL_KEY);
+  useAppLock.setState({ enabled: true, method: 'device', failedAttempts: 0, lockoutUntil: 0, locked: false });
+}
+
 /** Turns App Lock off and wipes the stored credential. */
 export async function disableAppLock() {
   await SecureStore.deleteItem(CREDENTIAL_KEY);
   useAppLock.setState({
     enabled: false,
     method: null,
-    useDeviceAuth: false,
     failedAttempts: 0,
     lockoutUntil: 0,
     locked: false,
   });
 }
 
-// True while the system biometric / device-credential prompt is up: it pauses our activity, and
-// that background/foreground round-trip must not count as leaving the app.
+// True from showing the system biometric / screen-lock prompt until the app is back in the
+// foreground afterwards: the prompt (especially the screen-lock fallback) pauses our activity,
+// and that background/foreground round-trip must not count as leaving the app.
 let systemPromptActive = false;
+let promptSettled = false;
 
 export function isSystemPromptActive() {
   return systemPromptActive;
 }
 
+AppState.addEventListener('change', (next) => {
+  // The first return to the foreground after the prompt finished ends the ignore window.
+  if (next === 'active' && promptSettled) {
+    systemPromptActive = false;
+    promptSettled = false;
+  }
+});
+
 /** Shows the system biometric / screen-lock prompt. Resolves true when the user passes it. */
 export async function authenticateWithDevice(): Promise<boolean> {
+  if (systemPromptActive && !promptSettled) return false; // one prompt at a time
   systemPromptActive = true;
+  promptSettled = false;
   try {
     return await SecureStore.authenticate('Unlock Spend Hive', 'Use your fingerprint, face or screen lock');
   } catch {
     return false;
   } finally {
-    // The activity resumes slightly after the callback; keep ignoring that transition briefly.
-    setTimeout(() => {
-      systemPromptActive = false;
-    }, 800);
+    promptSettled = true;
+    // Some prompts never pause the activity; then there is no 'active' event to wait for.
+    if (AppState.currentState === 'active') {
+      setTimeout(() => {
+        if (promptSettled && AppState.currentState === 'active') {
+          systemPromptActive = false;
+          promptSettled = false;
+        }
+      }, 1500);
+    }
   }
 }
 

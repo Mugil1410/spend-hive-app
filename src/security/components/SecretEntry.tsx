@@ -1,11 +1,11 @@
 import React from 'react';
-import { LockMethod } from '../appLockStore';
+import { CustomLockMethod } from '../appLockStore';
 import { PinEntry } from './PinEntry';
 import { PasscodeEntry } from './PasscodeEntry';
 import { PatternEntry } from './PatternEntry';
 
 interface Props {
-  method: LockMethod;
+  method: CustomLockMethod;
   onSubmit: (secret: string) => void;
   disabled?: boolean;
   error?: boolean;

@@ -5,7 +5,8 @@ import { MaterialDesignIcons as MaterialCommunityIcons } from '@react-native-vec
 import { useTheme } from '@/theme/ThemeContext';
 import { Logo } from '@/components/Logo';
 import { useAppLock } from './appLockStore';
-import { authenticateWithDevice, METHOD_LABELS, unlock, verifySecret } from './AppLockService';
+import { authenticateWithDevice, disableAppLock, METHOD_LABELS, unlock, verifySecret } from './AppLockService';
+import { SecureStore } from '@/native/SecureStore';
 import { SecretEntry } from './components/SecretEntry';
 
 /** Full-screen overlay shown above the navigator while the app is locked. */
@@ -13,7 +14,7 @@ export function LockScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const method = useAppLock((s) => s.method);
-  const useDeviceAuth = useAppLock((s) => s.useDeviceAuth);
+  const isDevice = method === 'device';
   const pinLength = useAppLock((s) => s.pinLength);
   const lockoutUntil = useAppLock((s) => s.lockoutUntil);
 
@@ -40,12 +41,20 @@ export function LockScreen() {
   }, []);
 
   const tryDeviceAuth = useCallback(async () => {
+    // If the phone's screen lock was removed since, the prompt can never succeed; the lock it
+    // relied on no longer exists, so turn App Lock off rather than locking the user out.
+    const status = await SecureStore.getDeviceAuthStatus().catch(() => null);
+    if (status && !status.available) {
+      await disableAppLock();
+      return;
+    }
     if (await authenticateWithDevice()) unlock();
+    else setMessage('Not unlocked. Tap below to try again.');
   }, []);
 
   // Offer the system prompt once per lock, as soon as the app is in the foreground.
   useEffect(() => {
-    if (!useDeviceAuth) return;
+    if (!isDevice) return;
     const maybePrompt = () => {
       if (promptedRef.current || AppState.currentState !== 'active') return;
       promptedRef.current = true;
@@ -54,7 +63,7 @@ export function LockScreen() {
     maybePrompt();
     const sub = AppState.addEventListener('change', maybePrompt);
     return () => sub.remove();
-  }, [useDeviceAuth, tryDeviceAuth]);
+  }, [isDevice, tryDeviceAuth]);
 
   async function handleSubmit(secret: string) {
     if (busy) return;
@@ -95,28 +104,32 @@ export function LockScreen() {
             <Logo size={64} color={colors.gold} letterColor={colors.background} />
             <Text style={[typography.h1, { marginTop: 12 }]}>Spend Hive is locked</Text>
             <Text style={[typography.caption, { textAlign: 'center' }]}>
-              {method === 'pattern' ? 'Draw your pattern' : `Enter your ${METHOD_LABELS[method]}`} to continue
+              {isDevice
+                ? 'Use your fingerprint, face or screen lock'
+                : method === 'pattern'
+                  ? 'Draw your pattern to continue'
+                  : `Enter your ${METHOD_LABELS[method]} to continue`}
             </Text>
             <Text style={[typography.caption, styles.message, { color: colors.expense }]} accessibilityLiveRegion="polite">
               {lockedOut ? `Try again in ${secondsLeft}s` : message ?? ' '}
             </Text>
           </View>
 
-          <SecretEntry
-            method={method}
-            onSubmit={handleSubmit}
-            disabled={busy || lockedOut}
-            error={error}
-            resetKey={resetKey}
-            pinAutoSubmitLength={pinLength}
-            submitLabel="Unlock"
-          />
-
-          {useDeviceAuth && (
+          {isDevice ? (
             <TouchableOpacity style={styles.deviceButton} onPress={tryDeviceAuth}>
-              <MaterialCommunityIcons name="fingerprint" size={22} color={colors.gold} />
-              <Text style={[typography.body, { color: colors.gold, fontWeight: '600' }]}>Use device unlock</Text>
+              <MaterialCommunityIcons name="fingerprint" size={28} color={colors.background} />
+              <Text style={[typography.body, { color: colors.background, fontWeight: '700' }]}>Unlock</Text>
             </TouchableOpacity>
+          ) : (
+            <SecretEntry
+              method={method}
+              onSubmit={handleSubmit}
+              disabled={busy || lockedOut}
+              error={error}
+              resetKey={resetKey}
+              pinAutoSubmitLength={pinLength}
+              submitLabel="Unlock"
+            />
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -130,6 +143,14 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
     content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, paddingHorizontal: 24 },
     head: { alignItems: 'center', gap: 6 },
     message: { minHeight: 18, textAlign: 'center', marginTop: 4 },
-    deviceButton: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10 },
+    deviceButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: colors.gold,
+      borderRadius: 999,
+      paddingVertical: 14,
+      paddingHorizontal: 32,
+    },
   });
 }

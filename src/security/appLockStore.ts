@@ -2,15 +2,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { appStorage } from '@/store/storage';
 
-export type LockMethod = 'pin' | 'passcode' | 'pattern';
+/** 'device' = the phone's own biometrics / screen lock; the rest are Spend Hive-only credentials. */
+export type LockMethod = 'device' | 'pin' | 'passcode' | 'pattern';
+export type CustomLockMethod = Exclude<LockMethod, 'device'>;
 
 export interface AppLockState {
   enabled: boolean;
   method: LockMethod | null;
   /** 0 = lock as soon as the app leaves the foreground. */
   timeoutMinutes: number;
-  /** Also offer the system biometric / screen-lock prompt on the lock screen. */
-  useDeviceAuth: boolean;
   /** PIN length, so the lock screen can submit as soon as enough digits are typed. */
   pinLength: number;
   failedAttempts: number;
@@ -33,7 +33,6 @@ export const useAppLock = create<AppLockState>()(
       enabled: false,
       method: null,
       timeoutMinutes: 0,
-      useDeviceAuth: false,
       pinLength: 4,
       failedAttempts: 0,
       lockoutUntil: 0,
@@ -44,12 +43,17 @@ export const useAppLock = create<AppLockState>()(
     {
       name: 'spendhive-app-lock',
       storage: createJSONStorage(() => appStorage),
-      version: 1,
+      version: 2,
+      // v2: "use device authentication" stopped being an add-on to a custom lock; it is now its own
+      // method. Existing custom locks are kept as they are.
+      migrate: (persisted: any) => {
+        const { useDeviceAuth: _drop, ...rest } = persisted ?? {};
+        return rest;
+      },
       partialize: (s) => ({
         enabled: s.enabled,
         method: s.method,
         timeoutMinutes: s.timeoutMinutes,
-        useDeviceAuth: s.useDeviceAuth,
         pinLength: s.pinLength,
         failedAttempts: s.failedAttempts,
         lockoutUntil: s.lockoutUntil,
