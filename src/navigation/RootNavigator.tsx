@@ -19,6 +19,8 @@ import { EventFormModal } from '@/screens/Modals/EventFormModal';
 import { EventDetailScreen } from '@/screens/Events/EventDetailScreen';
 import { BackupPasswordModal } from '@/screens/Modals/BackupPasswordModal';
 import { BackupEncryptModal } from '@/screens/Modals/BackupEncryptModal';
+import { CloudRestoreModal } from '@/screens/Modals/CloudRestoreModal';
+import { TermsPrivacyScreen } from '@/screens/Settings/TermsPrivacyScreen';
 import { NotificationsScreen } from '@/screens/Notifications/NotificationsScreen';
 import { SystemAnalyticsScreen } from '@/screens/SystemAnalytics/SystemAnalyticsScreen';
 import { AppLockSettingsScreen } from '@/screens/Security/AppLockSettingsScreen';
@@ -60,6 +62,7 @@ export function RootNavigator() {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="SystemAnalytics" component={SystemAnalyticsScreen} />
           <Stack.Screen name="AppLockSettings" component={AppLockSettingsScreen} />
+          <Stack.Screen name="TermsPrivacy" component={TermsPrivacyScreen} />
         </Stack.Group>
         <Stack.Group screenOptions={{ ...TransitionPresets.ModalSlideFromBottomIOS, presentation: 'modal' }}>
           <Stack.Screen name="QuickAdd" component={QuickAddModal} />
@@ -75,6 +78,7 @@ export function RootNavigator() {
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="BackupPassword" component={BackupPasswordModal} />
           <Stack.Screen name="BackupEncrypt" component={BackupEncryptModal} />
+          <Stack.Screen name="CloudRestore" component={CloudRestoreModal} />
           <Stack.Screen name="AppLockSetup" component={AppLockSetupScreen} />
         </Stack.Group>
       </Stack.Navigator>

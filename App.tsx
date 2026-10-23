@@ -11,12 +11,16 @@ import { useNotifications } from '@/notifications/useNotifications';
 import { useAppLock } from '@/security/appLockStore';
 import { useAppLockLifecycle } from '@/security/useAppLockLifecycle';
 import { LockScreen } from '@/security/LockScreen';
+import { useRequiredUpdate, useUpdateCheck } from '@/update/updateCheck';
+import { UpdateRequiredScreen } from '@/update/UpdateRequiredScreen';
 
 function AppContent() {
   const { colors, scheme } = useTheme();
   const locked = useAppLock((s) => s.locked);
+  const requiredUpdate = useRequiredUpdate((s) => s.required);
   useNotifications();
   useAppLockLifecycle();
+  useUpdateCheck();
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -25,6 +29,7 @@ function AppContent() {
         <RootNavigator />
         {/* An overlay rather than a route, so locking keeps the navigation state underneath. */}
         {locked && <LockScreen />}
+        {requiredUpdate && <UpdateRequiredScreen update={requiredUpdate} />}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

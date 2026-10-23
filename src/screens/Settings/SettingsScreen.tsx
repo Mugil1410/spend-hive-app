@@ -14,7 +14,9 @@ import { buildTransactionsCsv } from '@/utils/exportCsv';
 import { setPendingRestoreText } from '@/utils/pendingRestore';
 import { parseDbBackupJson, DbBackup } from '@/utils/dbBackup';
 import { saveAndShare } from '@/utils/backupFile';
+import { ensureOnline } from '@/services/cloudBackup';
 import { format } from 'date-fns';
+import DeviceInfo from 'react-native-device-info';
 import { useAppLock } from '@/security/appLockStore';
 import { describeTimeout, METHOD_LABELS } from '@/security/AppLockService';
 
@@ -58,7 +60,7 @@ export function SettingsScreen() {
   }
 
   function handleBackup() {
-    navigation.navigate('BackupEncrypt');
+    navigation.navigate('BackupEncrypt', { target: 'local' });
   }
 
   async function handleRestore() {
@@ -151,16 +153,33 @@ export function SettingsScreen() {
         <Card>
           <SettingsRow
             icon="content-save-outline"
-            label="Backup"
-            description="Save a backup file of your data"
+            label="Backup to Device"
+            description="Save an encrypted backup file on this phone"
             onPress={handleBackup}
           />
           <View style={styles.divider} />
           <SettingsRow
             icon="backup-restore"
-            label="Restore"
+            label="Restore from File"
             description="Restore your data from a backup file"
             onPress={handleRestore}
+          />
+        </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>CLOUD BACKUP (OPTIONAL)</Text>
+        <Card>
+          <SettingsRow
+            icon="cloud-upload-outline"
+            label="Backup to Cloud"
+            description="Keep up to 3 encrypted backups linked to this phone, or to your email for a new phone"
+            onPress={async () => (await ensureOnline()) && navigation.navigate('BackupEncrypt', { target: 'cloud' })}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon="cloud-download-outline"
+            label="Restore from Cloud"
+            description="Pick one of your cloud backups to restore, or delete old ones"
+            onPress={async () => (await ensureOnline()) && navigation.navigate('CloudRestore')}
           />
         </Card>
 
@@ -192,6 +211,19 @@ export function SettingsScreen() {
             onPress={handleDeleteAllTransactions}
           />
         </Card>
+
+        <Text style={[typography.label, { marginTop: 16 }]}>ABOUT</Text>
+        <Card>
+          <SettingsRow
+            icon="file-document-outline"
+            label="Terms & Privacy"
+            description="Services used, data collected and terms of use"
+            onPress={() => navigation.navigate('TermsPrivacy')}
+          />
+        </Card>
+        <Text style={[typography.caption, { textAlign: 'center', marginTop: 8 }]}>
+          Spend Hive v{DeviceInfo.getVersion()}
+        </Text>
       </ScrollView>
     </View>
   );

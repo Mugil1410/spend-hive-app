@@ -32,8 +32,11 @@ export type RootStackParamList = {
   DebtorForm: { debtorId?: string } | undefined;
   // Unlocks a password-encrypted backup picked for restore.
   BackupPassword: undefined;
-  // Asks for a password and writes an encrypted backup.
-  BackupEncrypt: undefined;
+  // Asks for a password and writes an encrypted backup to a file, or uploads it to the cloud.
+  BackupEncrypt: { target?: 'local' | 'cloud' } | undefined;
+  // Lists the cloud backups for an email and restores the one picked.
+  CloudRestore: undefined;
+  TermsPrivacy: undefined;
   EventForm: { eventId?: string } | undefined;
   EventDetail: { eventId: string };
   Notifications: undefined;
